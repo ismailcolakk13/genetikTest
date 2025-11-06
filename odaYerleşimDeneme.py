@@ -17,7 +17,7 @@ oda_plani = { #Bu örnek çıktıdır!!
 
 ODA_GENISLIK = 3.52
 ODA_DERINLIK = 5.0
-YATAK_BOYUT = (1.05, 2.1)
+YATAK_BOYUT = (2.1, 1.05)
 MASA_BOYUT = (1.1, 0.6)
 KAPI_ALANI = {"x1": 0.0, "y1": 0.0, "x2": 0.99, "y2": 0.8}
 DOLAP_BOYUT = (2.0, 0.7)
@@ -72,119 +72,142 @@ def get_mobilya_koordinatlari(mobilya_dict):
     return {"ad": ad, "x1": x1, "y1": y1, "x2": x2, "y2": y2}
 
 
-def calculate_fitness(plan):
-    total_puan = 0
+def _hesapla_koordinatlar(plan):
     mobilya_koordinatlari_listesi = []
-
-    # Koordinat hesaplama
     for mob_dict in plan["mobilyalar"]:
         yeni_koordinat = get_mobilya_koordinatlari(mob_dict)
         mobilya_koordinatlari_listesi.append(yeni_koordinat)
-
-    for mob in mobilya_koordinatlari_listesi:
-        # Duvar dışına taşıyor mu
-        if (mob["x1"] < 0 or mob["x2"] > ODA_GENISLIK or
-           mob["y1"] < 0 or mob["y2"] > ODA_DERINLIK):
-            total_puan -= 10000
-
-        # Kapıyı engelliyor mu
-        if dikdortgenler_cakisiyor(mob, KAPI_ALANI):
-            total_puan -= 5000
         
-        # Peteği engelliyor mu
+    koordinat_sozlugu = {mob["ad"]: mob for mob in mobilya_koordinatlari_listesi}
+    return mobilya_koordinatlari_listesi, koordinat_sozlugu
+
+def _hesapla_statik_cezalar(mobilya_koordinatlari_listesi):
+    puan=0
+    for mob in mobilya_koordinatlari_listesi:
+        if(mob["x1"]<0 or mob["x2"] > ODA_GENISLIK or
+           mob["y1"]<0 or mob["y2"] >ODA_DERINLIK):
+            puan -= 10000
+            
+        if dikdortgenler_cakisiyor(mob, KAPI_ALANI):
+            puan -=5000
+            
         if dikdortgenler_cakisiyor(mob, PETEK_ALANI):
-            total_puan -= 5000
-            
-        # Camı engelliyor mu
+            puan -=5000
+
         if dikdortgenler_cakisiyor(mob, CAM_ALANI):
-            total_puan -= 5000
+            puan -=5000
             
-        pass
+    return puan
 
-    # Mobilyalar çakışıyor mu
-    # Sadece mob1 vs mob2 değil, TÜM çiftleri kontrol et
+def _hesapla_dinamik_cezalar(mobilya_koordinatlari_listesi):
+    puan=0
     for i in range(len(mobilya_koordinatlari_listesi)):
-        for j in range(i + 1, len(mobilya_koordinatlari_listesi)):
-            mob1 = mobilya_koordinatlari_listesi[i]
-            mob2 = mobilya_koordinatlari_listesi[j]
+        for j in range(i+1,len(mobilya_koordinatlari_listesi)):
+            mob1= mobilya_koordinatlari_listesi[i]
+            mob2= mobilya_koordinatlari_listesi[j]
             if dikdortgenler_cakisiyor(mob1, mob2):
-                total_puan -= 5000 # Kural aynı, kapsamı genişledi
+                puan -=5000
+    return puan
 
+def _hesapla_oduller(plan,koordinat_sozlugu):
+    puan = 0
     TOLERANS = 0.05
     
-    for i in range(len(plan["mobilyalar"])):
-        mob_dict= plan["mobilyalar"][i]
-        mob_koor = mobilya_koordinatlari_listesi[i]
-        ad= mob_dict["ad"]
-        
+    for mob_dict in plan["mobilyalar"]:
+        ad = mob_dict["ad"]
+        mob_koor = koordinat_sozlugu.get(ad)
+        if not mob_koor: continue
+    
         orjinal_genislik,orjinal_derinlik = AD_BOYUT_SOZLUGU[ad]
         
-        if ad == "yatak" or ad=="ranza":
-            if (mob_koor["x1"] < TOLERANS) or \
-               (mob_koor["x2"] > ODA_GENISLIK - TOLERANS) or \
-               (mob_koor["y1"] < TOLERANS) or \
-               (mob_koor["y2"] > ODA_DERINLIK - TOLERANS):
-                total_puan += 100
-            
-        else:
-            uzun_kenar_duvarda = False
-            rotasyon= mob_dict["r"]
+        if not (ad == "dolap" or ad == "ranza"):
+            if(mob_koor["x1"]<TOLERANS) or (mob_koor["x2"] > ODA_GENISLIK-TOLERANS) or \
+                (mob_koor["y1"] <TOLERANS) or (mob_koor["y2"]>ODA_DERINLIK-TOLERANS):
+                    puan += 150
+        else: #Dolap ve ranzanın uzun kenarı duvara dayalı mı
+            uzun_kenar_duvarda=False
+            rotasyon = mob_dict["r"]
             
             if orjinal_genislik > orjinal_derinlik:
-                # Orijinal 'genişlik' (X) uzun kenar
                 if rotasyon == 0:
-                    # Uzun kenar (X'e paralel) duvara dayalı mı? (Arka kenar: y1 veya y2)
-                    if mob_koor["y1"] < TOLERANS or mob_koor["y2"] > ODA_DERINLIK - TOLERANS:
-                        uzun_kenar_duvarda = True
-                else: # r=90
-                    # Uzun kenar (Y'ye paralel) duvara dayalı mı? (Arka kenar: x1 veya x2)
-                    if mob_koor["x1"] < TOLERANS or mob_koor["x2"] > ODA_GENISLIK - TOLERANS:
-                        uzun_kenar_duvarda = True
+                    if mob_koor["y1"] < TOLERANS or mob_koor["y2"] > ODA_DERINLIK - TOLERANS: uzun_kenar_duvarda = True
+                else:
+                    if mob_koor["x1"] < TOLERANS or mob_koor["x2"] > ODA_GENISLIK - TOLERANS: uzun_kenar_duvarda = True
+            else:
+                if rotasyon == 0:
+                    if mob_koor["x1"] < TOLERANS or mob_koor["x2"] > ODA_GENISLIK - TOLERANS: uzun_kenar_duvarda = True
+                else:
+                    if mob_koor["y1"] < TOLERANS or mob_koor["y2"] > ODA_DERINLIK - TOLERANS: uzun_kenar_duvarda = True
                         
-            else:
-                if rotasyon == 0:
-                    # Uzun kenar (Y'ye paralel) duvara dayalı mı? (Arka kenar: x1 veya x2)
-                    if mob_koor["x1"] < TOLERANS or mob_koor["x2"] > ODA_GENISLIK - TOLERANS:
-                        uzun_kenar_duvarda = True
-                else: # r=90
-                    # Uzun kenar (X'e paralel) duvara dayalı mı? (Arka kenar: y1 veya y2)
-                    if mob_koor["y1"] < TOLERANS or mob_koor["y2"] > ODA_DERINLIK - TOLERANS:
-                        uzun_kenar_duvarda = True
-            
             if uzun_kenar_duvarda:
-                total_puan += 150 # Bu daha önemli, daha çok ödül ver
-            else:
-                total_puan -= 500
-                
-                
-    # Önce tüm 'koor' ları güvenle bulalım
-    yatak_koor, masa_koor, dolap_koor = None, None, None
-    for mob in mobilya_koordinatlari_listesi:
-        if mob["ad"] == "yatak": yatak_koor = mob
-        if mob["ad"] == "masa": masa_koor = mob
-        if mob["ad"] == "dolap": dolap_koor = mob
-        # (Dilerseniz diğerlerini de buraya ekleyebilirsiniz)
+                puan += 300
+            
+            
+    masa_koor = koordinat_sozlugu.get("masa")
+    dolap_koor = koordinat_sozlugu.get("dolap")
+    kitaplik_koor = koordinat_sozlugu.get("kitaplik")
+    
+    plan_dict_sozlugu = {mob["ad"]: mob for mob in plan["mobilyalar"]}
+    masa_dict = plan_dict_sozlugu.get("masa")
+    dolap_dict = plan_dict_sozlugu.get("dolap")
+    kitaplik_dict = plan_dict_sozlugu.get("kitaplik")
+    
+    # Kural: "Masanın önü açık mı?" (1m)
+    if masa_koor and masa_dict:
+        # Masanın "önünü" tanımlayan bir tampon bölge oluştur
+        if masa_dict["r"] == 0: # Masa 1.1(G) x 0.6(D) duruyor
+            # Önü: Y ekseninde -1m (Alt tarafı)
+            masa_onu = {"x1": masa_koor["x1"], "y1": masa_koor["y1"] - 1.0, 
+                        "x2": masa_koor["x2"], "y2": masa_koor["y1"]}
+        else: # Masa 0.6(G) x 1.1(D) duruyor
+            # Önü: X ekseninde -1m (Sol tarafı) - (Sol tarafın 'ön' olduğunu varsayıyoruz)
+            masa_onu = {"x1": masa_koor["x1"] - 1.0, "y1": masa_koor["y1"], 
+                        "x2": masa_koor["x1"], "y2": masa_koor["y2"]}
         
-    # Yatak masa arası en az 0.5m boşluk olsun
-    # DÜZELTME: None hatasını önlemek için 'if' bloğuna alındı
-    # if yatak_koor and masa_koor:
-    #     masa_tampon_bolgesi = {
-    #         "x1": masa_koor["x1"] - 0.5, "y1": masa_koor["y1"] - 0.5,
-    #         "x2": masa_koor["x2"] + 0.5, "y2": masa_koor["y2"] + 0.5
-    #     }
-    #     if (dikdortgenler_cakisiyor(yatak_koor, masa_tampon_bolgesi)):
-    #         total_puan -= 200 
+        # Diğer mobilyalar bu "ön" bölgeye giriyor mu?
+        for ad, koor in koordinat_sozlugu.items():
+            if ad != "masa" and dikdortgenler_cakisiyor(koor, masa_onu):
+                puan -= 200 # Masanın önünü kapattı!
+    
+    # Kural: "Dolabın önü açık mı?" (0.5m)
+    if dolap_koor and dolap_dict:
+        if dolap_dict["r"] == 0: # 2.0(G) x 0.7(D)
+            dolap_onu = {"x1": dolap_koor["x1"], "y1": dolap_koor["y1"] - 0.5, 
+                         "x2": dolap_koor["x2"], "y2": dolap_koor["y1"]}
+        else: # 0.7(G) x 2.0(D)
+            dolap_onu = {"x1": dolap_koor["x1"] - 0.5, "y1": dolap_koor["y1"], 
+                         "x2": dolap_koor["x1"], "y2": dolap_koor["y2"]}
+        
+        for ad, koor in koordinat_sozlugu.items():
+            if ad != "dolap" and dikdortgenler_cakisiyor(koor, dolap_onu):
+                puan -= 200 # Dolabın önünü kapattı!
+
+    # Kural: "Kitaplığın önü açık mı?" (0.5m)
+    if kitaplik_koor and kitaplik_dict:
+        if kitaplik_dict["r"] == 0: # 0.60(G) x 0.24(D)
+            kitaplik_onu = {"x1": kitaplik_koor["x1"], "y1": kitaplik_koor["y1"] - 0.5, 
+                            "x2": kitaplik_koor["x2"], "y2": kitaplik_koor["y1"]}
+        else: # 0.24(G) x 0.60(D)
+            kitaplik_onu = {"x1": kitaplik_koor["x1"] - 0.5, "y1": kitaplik_koor["y1"], 
+                            "x2": kitaplik_koor["x1"], "y2": kitaplik_koor["y2"]}
+
+        for ad, koor in koordinat_sozlugu.items():
+            if ad != "kitaplik" and dikdortgenler_cakisiyor(koor, kitaplik_onu):
+                puan -= 200 # Kitaplığın önünü kapattı!
+    
+    return puan
+    
             
-    # Dolap ile yatak arası en az 0.5 olsun
-    # if yatak_koor and dolap_koor:
-    #     dolap_tampon_bolgesi = {
-    #         "x1": dolap_koor["x1"] - 0.5, "y1": dolap_koor["y1"] - 0.5,
-    #         "x2": dolap_koor["x2"] + 0.5, "y2": dolap_koor["y2"] + 0.5
-    #     }
-    #     if (dikdortgenler_cakisiyor(yatak_koor, dolap_tampon_bolgesi)):
-    #         total_puan -= 200
-            
+def calculate_fitness(plan):
+    total_puan = 0
+    
+    koor_listesi,koor_sozlugu = _hesapla_koordinatlar(plan)
+    total_puan += _hesapla_statik_cezalar(koor_listesi)
+    total_puan += _hesapla_dinamik_cezalar(koor_listesi)
+    total_puan += _hesapla_oduller(plan, koor_sozlugu)
+    
     return total_puan
+
 
 def create_random_plan():
     plan = {"mobilyalar": []}
@@ -283,7 +306,6 @@ for nesil in range(NESIL_SAYISI):
 
     populasyon = yeni_populasyon
 
-print("\n Evrim tamamlandı")
 
 puanli_populasyon = []
 for plan in populasyon:
