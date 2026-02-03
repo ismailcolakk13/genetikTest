@@ -22,6 +22,14 @@ TARGET_CG_X=120.0
 TARGET_CG_Y=0.0
 TARGET_CG_Z=0.0
 
+
+
+MAX_YAKIT_AGIRLIGI = 35.0 # Tank tam doluyken eklenecek ekstra ağırlık
+DOLULUK_ORANLARI = [1.0, 0.0] # 1.0 = Dolu, 0.0 = Boş
+
+
+
+
 KOMPONENTLER_DB = [
     {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN"}, # Motor önde olur
     {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "SERBEST"},
@@ -115,28 +123,43 @@ def calculate_fitness_design(birey):
             
     puan-=tasma_sayisi*5000
     
-    #cg hesaplama
-    total_mass=0
-    moment_x=0
-    moment_y=0
-    moment_z=0
+
+
+
+    toplam_cg_hatasi = 0
+
+    # Her bir doluluk senaryosu için ayrı CG hesapla
+    for doluluk in DOLULUK_ORANLARI:
+        total_mass = 0
+        moment_x = 0
+        moment_y = 0
+        moment_z = 0
     
-    for k_id,pos in birey.yerlesim.items():
-        mass=next(item for item in KOMPONENTLER_DB if item["id"]==k_id)["agirlik"]
-        total_mass+=mass
-        moment_x+=mass*pos[0]
-        moment_y+=mass*pos[1]
-        moment_z+=mass*pos[2]
+        for k_id, pos in birey.yerlesim.items():
+            db_item = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+            mass = db_item["agirlik"]
+
+            # Yakıt tankı ise doluluk oranına göre ağırlık ekle
+            if k_id == "Yakit_Tanki":
+                mass += MAX_YAKIT_AGIRLIGI * doluluk
+
+            total_mass += mass
+            moment_x += mass * pos[0]
+            moment_y += mass * pos[1]
+            moment_z += mass * pos[2]
         
-    cg_x=moment_x/total_mass
-    cg_y=moment_y/total_mass
-    cg_z=moment_z/total_mass
-    
-    dist_error=((cg_x-TARGET_CG_X)**2 + (cg_y-TARGET_CG_Y)**2 + (cg_z-TARGET_CG_Z)**2)**0.5
-    
-    puan-=dist_error*100
-    
-    return puan,(cg_x,cg_y,cg_z)
+        cg_x = moment_x / total_mass
+        cg_y = moment_y / total_mass
+        cg_z = moment_z / total_mass
+        
+        # Hedef CG'ye olan mesafe hatası
+        dist_error = ((cg_x - TARGET_CG_X)**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
+        toplam_cg_hatasi += dist_error
+
+    # Ortalama hatayı puandan düş (Ceza yöntemi)
+    puan -= (toplam_cg_hatasi / len(DOLULUK_ORANLARI)) * 1000
+
+    return puan, (cg_x, cg_y, cg_z)
 
 
 #genetik işlemler
@@ -202,6 +225,9 @@ for gen in range(GENERATIONS):
     populasyon=yeni_pop
     
 en_iyi_tasarim=puanli_pop[0][1]
+# Analiz: Yakıt boşalırken CG ne kadar oynuyor?
+tank_pos = en_iyi_tasarim.yerlesim["Yakit_Tanki"]
+print(f"⛽ Yakıt Tankı Konumu: {tank_pos[0]:.1f} cm")
 
 #3d görsel
 def kutu_ciz(pos, dim, color, name):
@@ -354,6 +380,34 @@ for k_id, pos in en_iyi_tasarim.yerlesim.items():
     
     print(f"📍 {k_id}: Gövde Başından {pos[0]:.1f} cm geride.")
     idx += 1
+
+print("\n--- DENGE ANALİZİ ---")
+# En iyi birey için Dolu ve Boş durumları tekrar hesaplayalım
+tank_yer = en_iyi_tasarim.yerlesim["Yakit_Tanki"]
+cg_dolu = calculate_fitness_design(en_iyi_tasarim)[1] # Bu aslında son değeri döndürdüğü için yanıltabilir, manuel hesaplayalım:
+
+# Manuel doğrulama fonksiyonu (Hızlıca)
+def get_cg_for_fuel(birey, fuel_ratio):
+    t_mass, m_x = 0, 0
+    for k_id, pos in birey.yerlesim.items():
+        mass = next(i for i in KOMPONENTLER_DB if i["id"]==k_id)["agirlik"]
+        if k_id == "Yakit_Tanki": mass += MAX_YAKIT_AGIRLIGI * fuel_ratio
+        t_mass += mass
+        m_x += mass * pos[0]
+    return m_x / t_mass
+
+cg_dolu_x = get_cg_for_fuel(en_iyi_tasarim, 1.0)
+cg_bos_x = get_cg_for_fuel(en_iyi_tasarim, 0.0)
+
+print(f"Yakit Tanki Konumu (X): {tank_yer[0]:.2f} cm")
+print(f"CG (Dolu Depo)        : {cg_dolu_x:.2f} cm")
+print(f"CG (Bos Depo)         : {cg_bos_x:.2f} cm")
+print(f"CG Kaymasi (Drift)    : {abs(cg_dolu_x - cg_bos_x):.2f} cm")
+
+if abs(cg_dolu_x - cg_bos_x) < 2.0:
+    print("✅ MÜKEMMEL SONUÇ: Yakıt tüketimi dengeyi bozmuyor!")
+else:
+    print("⚠️ DİKKAT: Yakıt tüketimi dengeyi etkiliyor.")
 
 # 3. Ağırlık Merkezi (CG) Göstergeleri
 # Hedef CG
