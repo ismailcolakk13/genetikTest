@@ -18,7 +18,8 @@ GOVDE_UZUNLUK=300.0 #CM (x ekseni)
 GOVDE_CAP=60.0 # CM (y ve z ekseni genişliği)
 GOVDE_YARICAP=GOVDE_CAP/2
 
-TARGET_CG_X=120.0
+TARGET_CG_X_MIN=110.0
+TARGET_CG_X_MAX=130.0
 TARGET_CG_Y=0.0
 TARGET_CG_Z=0.0
 
@@ -71,7 +72,8 @@ class TasarimBireyi:
             elif bolge=="KUYRUK":
                 x=random.uniform(GOVDE_UZUNLUK-40,GOVDE_UZUNLUK)
             elif bolge=="MERKEZ":
-                x=random.uniform(TARGET_CG_X-30, TARGET_CG_X+30)
+                center_x = (TARGET_CG_X_MIN + TARGET_CG_X_MAX) / 2
+                x=random.uniform(center_x-30, center_x+30)
             else:
                 x=random.uniform(0, GOVDE_UZUNLUK)
                 
@@ -132,7 +134,15 @@ def calculate_fitness_design(birey):
     cg_y=moment_y/total_mass
     cg_z=moment_z/total_mass
     
-    dist_error=((cg_x-TARGET_CG_X)**2 + (cg_y-TARGET_CG_Y)**2 + (cg_z-TARGET_CG_Z)**2)**0.5
+    # CG X ekseninde aralık kontrolü
+    if cg_x < TARGET_CG_X_MIN:
+        dx = TARGET_CG_X_MIN - cg_x
+    elif cg_x > TARGET_CG_X_MAX:
+        dx = cg_x - TARGET_CG_X_MAX
+    else:
+        dx = 0.0 # Aralık içindeyse X hatası yok
+
+    dist_error=(dx**2 + (cg_y-TARGET_CG_Y)**2 + (cg_z-TARGET_CG_Z)**2)**0.5
     
     puan-=dist_error*100
     
@@ -188,7 +198,7 @@ for gen in range(GENERATIONS):
     best_cg=puanli_pop[0][2]
     
     if gen%10==0:
-        print(f"Nesil {gen}: Puan {best_score:.0f} | CG X: {best_cg[0]:.1f} (Hedef: {TARGET_CG_X})")
+        print(f"Nesil {gen}: Puan {best_score:.0f} | CG X: {best_cg[0]:.1f} (Hedef: {TARGET_CG_X_MIN}-{TARGET_CG_X_MAX})")
         
     yeni_pop=[x[1]for x in puanli_pop[:10]]
     
@@ -356,23 +366,45 @@ for k_id, pos in en_iyi_tasarim.yerlesim.items():
     idx += 1
 
 # 3. Ağırlık Merkezi (CG) Göstergeleri
-# Hedef CG
-fig.add_trace(go.Scatter3d(
-    x=[TARGET_CG_X], y=[TARGET_CG_Y], z=[TARGET_CG_Z],
-    mode='markers+text', marker=dict(size=8, color='red', symbol='cross'),
-    name='HEDEF CG', text=["HEDEF"], textposition="bottom center"
+# 3. Ağırlık Merkezi (CG) Göstergeleri
+# Hedef CG Aralığı (Altın Sarısı Yarı Şeffaf Kutu - Yakıt tankıyla karışmasın diye)
+fig.add_trace(go.Mesh3d(
+    x=[TARGET_CG_X_MIN, TARGET_CG_X_MAX, TARGET_CG_X_MAX, TARGET_CG_X_MIN, TARGET_CG_X_MIN, TARGET_CG_X_MAX, TARGET_CG_X_MAX, TARGET_CG_X_MIN],
+    y=[-5, -5, 5, 5, -5, -5, 5, 5],
+    z=[-5, -5, -5, -5, 5, 5, 5, 5],
+    color='gold', opacity=0.4, name='HEDEF CG ARALIĞI',
+    alphahull=0
 ))
 
-# Hesaplanan (Sonuç) CG
+# Hesaplanan (Sonuç) CG - Görünürlük için yukarı taşıyoruz
+viz_z = GOVDE_YARICAP + 40 # Gövdenin üstünde, her zaman görünür olması için
+
+fig.add_trace(go.Scatter3d(
+    x=[best_cg[0]], y=[best_cg[1]], z=[viz_z],
+    mode='markers+text', marker=dict(size=12, color='black', symbol='diamond'),
+    name='HESAPLANAN CG', text=["HESAPLANAN CG"], textposition="top center"
+))
+
+# Gerçek CG noktasına dikey çizgi (Drop line)
+fig.add_trace(go.Scatter3d(
+    x=[best_cg[0], best_cg[0]], y=[best_cg[1], best_cg[1]], z=[best_cg[2], viz_z],
+    mode='lines', line=dict(color='black', width=3), showlegend=False, hoverinfo='skip'
+))
+
+# Gerçek CG noktası (İçeride kalan küçük nokta)
 fig.add_trace(go.Scatter3d(
     x=[best_cg[0]], y=[best_cg[1]], z=[best_cg[2]],
-    mode='markers+text', marker=dict(size=12, color='black', symbol='diamond'),
-    name='SONUÇ CG', text=["SONUÇ"], textposition="top center"
+    mode='markers', marker=dict(size=5, color='black'), 
+    name='Gerçek CG Konumu'
 ))
 
-# Çizgi Çek (Hata payını görselleştirmek için)
+# Çizgi Çek (Hata payını görselleştirmek için - En yakın sınıra)
+target_x_visual = best_cg[0]
+if best_cg[0] < TARGET_CG_X_MIN: target_x_visual = TARGET_CG_X_MIN
+elif best_cg[0] > TARGET_CG_X_MAX: target_x_visual = TARGET_CG_X_MAX
+
 fig.add_trace(go.Scatter3d(
-    x=[TARGET_CG_X, best_cg[0]], y=[TARGET_CG_Y, best_cg[1]], z=[TARGET_CG_Z, best_cg[2]],
+    x=[target_x_visual, best_cg[0]], y=[TARGET_CG_Y, best_cg[1]], z=[TARGET_CG_Z, best_cg[2]],
     mode='lines', line=dict(color='red', width=4, dash='dot'), name='CG Hatası'
 ))
 
