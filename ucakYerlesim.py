@@ -24,6 +24,9 @@ TARGET_CG_X_MIN = 110.0
 TARGET_CG_X_MAX = 130.0
 TARGET_CG_Y = 0.0
 TARGET_CG_Z = 0.0
+# MİNİMUM BOŞLUK (Clearance) - Parçalar arası ve gövde ile mesafe
+MIN_CLEARANCE = 5.0 # CM
+YAPISAL_KALINLIK = 2.0 # CM (Gövde kabuğu kalınlığı)
 
 # BÖLGE TANIMLARI (Sınırlar)
 BOLGE_BURUN_SON = 50.0 # Motor ve burun bombesi (Biraz uzattık)
@@ -40,13 +43,20 @@ KOMPONENTLER_DB = [
     {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT", "kilitli": False},
 ]
 
-# Çakışma kontrolü
+# Çakışma kontrolü (Clearance dahil)
 def kutular_cakisiyor_mu(pos1, dim1, pos2, dim2):
-    min1 = [pos1[0]-dim1[0]/2, pos1[1]-dim1[1]/2, pos1[2]-dim1[2]/2]
-    max1 = [pos1[0]+dim1[0]/2, pos1[1]+dim1[1]/2, pos1[2]+dim1[2]/2]
+    # Etkili boyutları clearance kadar artırıyoruz
+    # Böylece parça boyutu sanki daha büyükmüş gibi kontrol edilir
+    # İki parça arasında toplamda en az MIN_CLEARANCE kadar boşluk kalır
     
-    min2 = [pos2[0]-dim2[0]/2, pos2[1]-dim2[1]/2, pos2[2]-dim2[2]/2]
-    max2 = [pos2[0]+dim2[0]/2, pos2[1]+dim2[1]/2, pos2[2]+dim2[2]/2]
+    # 1. Parçanın sanal sınırları (Yarım boy + yarım boşluk)
+    buff = MIN_CLEARANCE / 2.0
+    
+    min1 = [pos1[0] - dim1[0]/2 - buff, pos1[1] - dim1[1]/2 - buff, pos1[2] - dim1[2]/2 - buff]
+    max1 = [pos1[0] + dim1[0]/2 + buff, pos1[1] + dim1[1]/2 + buff, pos1[2] + dim1[2]/2 + buff]
+    
+    min2 = [pos2[0] - dim2[0]/2 - buff, pos2[1] - dim2[1]/2 - buff, pos2[2] - dim2[2]/2 - buff]
+    max2 = [pos2[0] + dim2[0]/2 + buff, pos2[1] + dim2[1]/2 + buff, pos2[2] + dim2[2]/2 + buff]
     
     return (
         min1[0] < max2[0] and max1[0] > min2[0] and
@@ -111,17 +121,20 @@ def superellipse_point(u, ry, rz, n=4):
     y = rz * np.sign(sin_u) * (np.abs(sin_u) ** (2/n))
     return x, y
 
-# Gövdeden taşma kontrolü (Superellipse Bazlı)
+# Gövdeden taşma kontrolü (Superellipse Bazlı + Yapısal Kalınlık)
 def govde_icinde_mi(pos, dim):
     x, y, z = pos
     dx, dy, dz = dim
     
-    x_min, x_max = x - dx/2, x + dx/2
+    # 1. Boylamasına (X ekseni) kontrol
+    # Parça gövde dışına çıkmamalı (Uçlarda da boşluk olsun)
+    x_min, x_max = x - dx/2 - YAPISAL_KALINLIK, x + dx/2 + YAPISAL_KALINLIK
     if x_min < 0 or x_max > GOVDE_UZUNLUK: return False
     
     check_x_points = [x_min, x, x_max]
-    check_y_offsets = [-dy/2, dy/2]
-    check_z_offsets = [-dz/2, dz/2]
+    # Y ve Z'de de yapısal kalınlık payını ekleyerek kontrol ediyoruz
+    check_y_offsets = [-(dy/2 + YAPISAL_KALINLIK), (dy/2 + YAPISAL_KALINLIK)]
+    check_z_offsets = [-(dz/2 + YAPISAL_KALINLIK), (dz/2 + YAPISAL_KALINLIK)]
     
     # Kesit şekli parametresi (n)
     # Kabin kısmında (60-180) n=4 (karemsi), uçlarda n=2.5 (daha yuvarlak)
