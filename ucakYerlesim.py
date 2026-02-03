@@ -28,13 +28,14 @@ BOLGE_BURUN_SON = 40.0
 BOLGE_KUYRUK_BAS = GOVDE_UZUNLUK - 40.0 # 260.0'dan sonrası kuyruk ucu
 
 KOMPONENTLER_DB = [
-    {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN"}, 
-    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "GOVDE"}, # Artık serbest değil, gövde içinde
-    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE"},
-    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE"},
-    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ"},
-    {"id": "Servo_Kuyruk","agirlik": 2.0,  "boyut": (5, 5, 5),    "sabit_bolge": "KUYRUK"},
-    {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT"}, # Kamera altta olur
+    # Motor artık KESİN SABİT (Locked). Burun ucunda sabit duruyor.
+    {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN", "sabit_pos": (30, 0, 0), "kilitli": True}, 
+    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "GOVDE", "kilitli": False}, # Artık serbest değil, gövde içinde
+    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False},
+    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False},
+    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ", "kilitli": False},
+    {"id": "Servo_Kuyruk","agirlik": 2.0,  "boyut": (5, 5, 5),    "sabit_bolge": "KUYRUK", "kilitli": False},
+    {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT", "kilitli": False}, # Kamera altta olur
 ]
 
 #Çakışma kontrolü
@@ -112,6 +113,11 @@ class TasarimBireyi:
         
     def rastgele_yerlestir(self):
         for komp in KOMPONENTLER_DB:
+            # Eğer parça kilitliyse (örn: Motor), sabit pozisyonunu al ve geç
+            if komp.get("kilitli", False):
+                self.yerlesim[komp["id"]] = komp["sabit_pos"]
+                continue
+            
             bolge=komp["sabit_bolge"]
             
             if bolge=="BURUN":
@@ -165,7 +171,7 @@ def calculate_fitness_design(birey):
         if not govde_icinde_mi(pos, dim):
             tasma_sayisi+=1
             
-    puan-=tasma_sayisi*5000
+    puan-=tasma_sayisi*10000
     
     #cg hesaplama
     total_mass=0
@@ -213,6 +219,11 @@ def crossover_design(parent1, parent2):
 
 def mutate_design(birey, rate=0.1):
     for k_id in birey.yerlesim:
+        # Kilitli parçaları mutasyona uğratma
+        comp_info = next((item for item in KOMPONENTLER_DB if item["id"] == k_id), None)
+        if comp_info and comp_info.get("kilitli", False):
+            continue
+
         if random.random() < rate:
             x, y, z = birey.yerlesim[k_id]
             # Küçük kaydırma
