@@ -23,12 +23,16 @@ TARGET_CG_X_MAX=130.0
 TARGET_CG_Y=0.0
 TARGET_CG_Z=0.0
 
+# BÖLGE TANIMLARI (Sınırlar)
+BOLGE_BURUN_SON = 40.0
+BOLGE_KUYRUK_BAS = GOVDE_UZUNLUK - 40.0 # 260.0'dan sonrası kuyruk ucu
+
 KOMPONENTLER_DB = [
-    {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN"}, # Motor önde olur
-    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "SERBEST"},
-    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "SERBEST"},
-    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "SERBEST"},
-    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ"}, # Genellikle CG yakını
+    {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN"}, 
+    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "GOVDE"}, # Artık serbest değil, gövde içinde
+    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE"},
+    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE"},
+    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ"},
     {"id": "Servo_Kuyruk","agirlik": 2.0,  "boyut": (5, 5, 5),    "sabit_bolge": "KUYRUK"},
     {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT"}, # Kamera altta olur
 ]
@@ -57,10 +61,10 @@ def get_fuselage_radius(x):
     if x < 0: return 0.0
     if x > GOVDE_UZUNLUK: return 0.0
     
-    if x < 50: 
+    if x < BOLGE_BURUN_SON: 
         # Burun kısmı (Parabolik artış)
-        return (x/50)**0.5 * GOVDE_YARICAP
-    elif x < 180: 
+        return (x/BOLGE_BURUN_SON)**0.5 * GOVDE_YARICAP
+    elif x < 180:  
         # Orta gövde (Sabit silindir)
         return GOVDE_YARICAP
     else: 
@@ -111,12 +115,15 @@ class TasarimBireyi:
             bolge=komp["sabit_bolge"]
             
             if bolge=="BURUN":
-                x=random.uniform(0,40)
+                x=random.uniform(0,BOLGE_BURUN_SON)
             elif bolge=="KUYRUK":
-                x=random.uniform(GOVDE_UZUNLUK-40,GOVDE_UZUNLUK)
+                x=random.uniform(BOLGE_KUYRUK_BAS,GOVDE_UZUNLUK)
             elif bolge=="MERKEZ":
                 center_x = (TARGET_CG_X_MIN + TARGET_CG_X_MAX) / 2
                 x=random.uniform(center_x-30, center_x+30)
+            elif bolge=="GOVDE":
+                # Burun ile Kuyruk arasındaki ana hacim
+                x=random.uniform(BOLGE_BURUN_SON, BOLGE_KUYRUK_BAS)
             else:
                 x=random.uniform(0, GOVDE_UZUNLUK)
                 
@@ -405,11 +412,13 @@ for k_id, pos in en_iyi_tasarim.yerlesim.items():
 
 # 3. Ağırlık Merkezi (CG) Göstergeleri
 # Hedef CG Aralığı (Altın Sarısı Yarı Şeffaf Kutu - Yakıt tankıyla karışmasın diye)
+# Görünür olması için gövde çapından biraz daha geniş çiziyoruz.
+box_r = GOVDE_YARICAP + 5 # Yarıçaptan 5cm daha geniş
 fig.add_trace(go.Mesh3d(
     x=[TARGET_CG_X_MIN, TARGET_CG_X_MAX, TARGET_CG_X_MAX, TARGET_CG_X_MIN, TARGET_CG_X_MIN, TARGET_CG_X_MAX, TARGET_CG_X_MAX, TARGET_CG_X_MIN],
-    y=[-5, -5, 5, 5, -5, -5, 5, 5],
-    z=[-5, -5, -5, -5, 5, 5, 5, 5],
-    color='gold', opacity=0.4, name='HEDEF CG ARALIĞI',
+    y=[-box_r, -box_r, box_r, box_r, -box_r, -box_r, box_r, box_r],
+    z=[-box_r, -box_r, -box_r, -box_r, box_r, box_r, box_r, box_r],
+    color='gold', opacity=0.3, name='HEDEF CG ARALIĞI',
     alphahull=0
 ))
 
