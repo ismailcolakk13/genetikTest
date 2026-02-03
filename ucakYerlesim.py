@@ -47,15 +47,58 @@ def kutular_cakisiyor_mu(pos1,dim1,pos2,dim2):
         min1[2]<max2[2] and max1[2]>min2[2]
         )
 
-#Gövdeden taşma kontrolü
-def govde_icinde_mi(pos,dim):
-    x_ok=(pos[0]-dim[0]/2 >=0) and (pos[0]+dim[0]/2 <=GOVDE_UZUNLUK)
+# Gövde Geometrisi Tanımı (Genelleştirilebilir Yapı)
+def get_fuselage_radius(x):
+    """
+    Verilen X konumundaki gövde yarıçapını döndürür.
+    Farklı uçak tipleri için bu fonksiyon değiştirilebilir.
+    Şu anki model: Burun kavisli, orta düz, kuyruk incelen.
+    """
+    if x < 0: return 0.0
+    if x > GOVDE_UZUNLUK: return 0.0
     
-    dist_y=abs(pos[1])+dim[1]/2
-    dist_z=abs(pos[2])+dim[2]/2
-    radial_ok=(dist_y**2 + dist_z**2)**0.5 <=GOVDE_YARICAP
+    if x < 50: 
+        # Burun kısmı (Parabolik artış)
+        return (x/50)**0.5 * GOVDE_YARICAP
+    elif x < 180: 
+        # Orta gövde (Sabit silindir)
+        return GOVDE_YARICAP
+    else: 
+        # Kuyruk kısmı (Lineer incelme)
+        # 180'den 300'e giderken yarıçap %100'den %20'ye düşüyor
+        ratio = (x - 180) / (GOVDE_UZUNLUK - 180)
+        return GOVDE_YARICAP * (1 - ratio * 0.8)
+
+#Gövdeden taşma kontrolü (Genelleştirilmiş)
+def govde_icinde_mi(pos, dim):
+    x, y, z = pos
+    dx, dy, dz = dim
     
-    return x_ok and radial_ok
+    # 1. Boylamasına (X ekseni) kontrol
+    x_min = x - dx/2
+    x_max = x + dx/2
+    
+    if x_min < 0 or x_max > GOVDE_UZUNLUK:
+        return False
+    
+    # 2. Radyal (Kesit) kontrolü
+    # Gövde kesiti X'e göre değiştiği için, parçanın
+    # hem başı hem sonu hem de ortası gövde sınırları içinde kalmalı.
+    
+    # Parçanın kesit köşegeni (Merkezden en uzak nokta)
+    # Eğer bu mesafe izin verilen yarıçaptan küçükse parça sığar.
+    # Not: Kare/Dikdörtgen kesit varsayımıyla köşegen alıyoruz.
+    part_radial_dist = ((abs(y) + dy/2)**2 + (abs(z) + dz/2)**2)**0.5
+    
+    # Kontrol edilecek noktalar: Ön, Orta, Arka
+    check_points = [x_min, x, x_max]
+    
+    for cx in check_points:
+        allowed_radius = get_fuselage_radius(cx)
+        if part_radial_dist > allowed_radius:
+            return False
+            
+    return True
     
 #Genetik alg. sınıfları
 
@@ -247,14 +290,9 @@ def ucak_govdesi_olustur():
     u, v = np.meshgrid(u, v)
     
     # Gövde şeklini belirleyen yarıçap fonksiyonu (Tapering)
-    # Burun sivri başlar, kabinde genişler, kuyrukta incelir
-    # Matematiksel bir "sigara" şekli oluşturuyoruz
-    def r_func(x):
-        if x < 50: return (x/50)**0.5 * GOVDE_YARICAP  # Burun kavisli
-        elif x < 180: return GOVDE_YARICAP             # Kabin düz
-        else: return (1 - (x-180)/(GOVDE_UZUNLUK-180)) * GOVDE_YARICAP * 0.8 # Kuyruk
+    # Artık merkezi fonksiyonu kullanıyoruz
     
-    r_values = np.array([r_func(x) for x in v.flatten()]).reshape(v.shape)
+    r_values = np.array([get_fuselage_radius(x) for x in v.flatten()]).reshape(v.shape)
     
     x_govde = v
     y_govde = r_values * np.cos(u)
@@ -365,7 +403,6 @@ for k_id, pos in en_iyi_tasarim.yerlesim.items():
     print(f"📍 {k_id}: Gövde Başından {pos[0]:.1f} cm geride.")
     idx += 1
 
-# 3. Ağırlık Merkezi (CG) Göstergeleri
 # 3. Ağırlık Merkezi (CG) Göstergeleri
 # Hedef CG Aralığı (Altın Sarısı Yarı Şeffaf Kutu - Yakıt tankıyla karışmasın diye)
 fig.add_trace(go.Mesh3d(
