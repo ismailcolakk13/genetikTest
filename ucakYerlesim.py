@@ -4,8 +4,6 @@ Created on Wed Nov  5 14:06:09 2025
 
 @author: ismai
 """
-# MATEMATIKSEL KONVANSIYONA GORE HESAPLAMALAR YAPILDI
-
 import copy
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -22,22 +20,23 @@ TARGET_CG_X=120.0
 TARGET_CG_Y=0.0
 TARGET_CG_Z=0.0
 
-
-
 MAX_YAKIT_AGIRLIGI = 35.0 # Tank tam doluyken eklenecek ekstra ağırlık
 DOLULUK_ORANLARI = [1.0, 0.0] # 1.0 = Dolu, 0.0 = Boş
 
+TITRESIM_LIMITI = 80.0 # cm (Hassas parçalar motora bundan daha yakın olmamalı)
 
-
-
+# (titresim_hassasiyeti eklendi)
 KOMPONENTLER_DB = [
-    {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN"}, # Motor önde olur
-    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "SERBEST"},
-    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "SERBEST"},
-    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "SERBEST"},
-    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ"}, # Genellikle CG yakını
-    {"id": "Servo_Kuyruk","agirlik": 2.0,  "boyut": (5, 5, 5),    "sabit_bolge": "KUYRUK"},
-    {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT"}, # Kamera altta olur
+    # Motor titreşim kaynağıdır, hassas değildir (False)
+    {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN", "titresim_hassasiyeti": False}, 
+    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "SERBEST", "titresim_hassasiyeti": False},
+    # Aviyonikler hassastır (True)
+    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "SERBEST", "titresim_hassasiyeti": True},
+    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "SERBEST", "titresim_hassasiyeti": True},
+    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ", "titresim_hassasiyeti": False},
+    {"id": "Servo_Kuyruk","agirlik": 2.0,  "boyut": (5, 5, 5),    "sabit_bolge": "KUYRUK", "titresim_hassasiyeti": False},
+    # Kamera görüntü titrememeli, hassastır (True)
+    {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT", "titresim_hassasiyeti": True}, 
 ]
 
 #Çakışma kontrolü
@@ -95,7 +94,7 @@ class TasarimBireyi:
 def calculate_fitness_design(birey):
     puan=0
     
-    #çakışma
+    # 1. Çakışma Cezası
     cakisma_sayisi=0
     keys=list(birey.yerlesim.keys())
     for i in range(len(keys)):
@@ -114,7 +113,7 @@ def calculate_fitness_design(birey):
     
     puan-=cakisma_sayisi*10000
     
-    #gövdeden taşma
+    # 2. Gövdeden Taşma Cezası
     tasma_sayisi=0
     for k_id,pos in birey.yerlesim.items():
         dim=next(item for item in KOMPONENTLER_DB if item["id"]==k_id)["boyut"]
@@ -123,9 +122,25 @@ def calculate_fitness_design(birey):
             
     puan-=tasma_sayisi*5000
     
+    # YENİ EKLENEN: TİTREŞİM KONTROLÜ ---
+    # Motoru bul (Titreşim kaynağı)
+    pos_motor = birey.yerlesim["Motor"] 
+    
+    for k_id, pos in birey.yerlesim.items():
+        # DB'den parça özelliklerini çek
+        parca_db = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+        
+        # Eğer parça hassassa kontrol et
+        if parca_db.get("titresim_hassasiyeti") == True:
+            # Motora olan mesafeyi hesapla
+            mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
+            
+            # Limitten yakınsa ceza kes
+            if mesafe < TITRESIM_LIMITI:
+                ihlâl = TITRESIM_LIMITI - mesafe
+                puan -= (ihlâl ** 2) * 50 # Karesel ceza uyguluyoruz ki hızla uzaklaşsın
 
-
-
+    # 4. CG (Ağırlık Merkezi) Hesabı
     toplam_cg_hatasi = 0
 
     # Her bir doluluk senaryosu için ayrı CG hesapla
@@ -364,9 +379,12 @@ colors = ['red', 'blue', 'orange', 'purple', 'green', 'brown', 'cyan']
 idx = 0
 
 print("\n--- YERLEŞİM DETAYLARI ---")
+motor_pos = en_iyi_tasarim.yerlesim["Motor"] # Motor referansı
+
 for k_id, pos in en_iyi_tasarim.yerlesim.items():
     # Boyut bilgisini DB'den çek
-    boyut = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)["boyut"]
+    db_item = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+    boyut = db_item["boyut"]
     
     # Kutuyu çiz
     fig.add_trace(parca_kutusu_ciz(pos, boyut, colors[idx % len(colors)], k_id))
@@ -378,7 +396,11 @@ for k_id, pos in en_iyi_tasarim.yerlesim.items():
         textfont=dict(size=10, color="black"), showlegend=False
     ))
     
-    print(f"📍 {k_id}: Gövde Başından {pos[0]:.1f} cm geride.")
+    # Motora Uzaklığı Yazdır (Görsel kontrol için)
+    dist_motor = ((pos[0]-motor_pos[0])**2 + (pos[1]-motor_pos[1])**2 + (pos[2]-motor_pos[2])**2)**0.5
+    uyari = " (!)" if db_item["titresim_hassasiyeti"] and dist_motor < TITRESIM_LIMITI else ""
+    print(f"📍 {k_id}: X={pos[0]:.1f} | Motora Uzaklık: {dist_motor:.1f} cm {uyari}")
+    
     idx += 1
 
 print("\n--- DENGE ANALİZİ ---")
@@ -436,7 +458,7 @@ camera = dict(
 )
 
 fig.update_layout(
-    title="Ön Tasarım: Uçak İçi Sistem Yerleşimi Optimizasyonu",
+    title="Ön Tasarım: Uçak İçi Sistem Yerleşimi Optimizasyonu (Titreşim Korumalı)",
     scene=dict(
         xaxis=dict(title='Uzunluk (cm)', range=[0, GOVDE_UZUNLUK], backgroundcolor="rgb(240, 240, 240)"),
         yaxis=dict(title='Genişlik (cm)', range=[-200, 200]), # Kanatları kapsasın diye geniş
