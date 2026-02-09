@@ -142,7 +142,8 @@ def calculate_fitness_design(birey):
 
     # 4. CG (Ağırlık Merkezi) Hesabı
     toplam_cg_hatasi = 0
-
+    # Sadece raporlama için kullanılacak değişken
+    dolu_cg_coords = (0,0,0)
     # Her bir doluluk senaryosu için ayrı CG hesapla
     for doluluk in DOLULUK_ORANLARI:
         total_mass = 0
@@ -167,6 +168,12 @@ def calculate_fitness_design(birey):
         cg_y = moment_y / total_mass
         cg_z = moment_z / total_mass
         
+
+    # Eğer doluluk 1.0 ise bu koordinatları raporlama için sakla
+        if doluluk == 1.0:
+            dolu_cg_coords = (cg_x, cg_y, cg_z)
+
+
         # Hedef CG'ye olan mesafe hatası
         dist_error = ((cg_x - TARGET_CG_X)**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
         toplam_cg_hatasi += dist_error
@@ -174,7 +181,7 @@ def calculate_fitness_design(birey):
     # Ortalama hatayı puandan düş (Ceza yöntemi)
     puan -= (toplam_cg_hatasi / len(DOLULUK_ORANLARI)) * 1000
 
-    return puan, (cg_x, cg_y, cg_z)
+    return puan, dolu_cg_coords
 
 
 #genetik işlemler
@@ -458,7 +465,7 @@ camera = dict(
 )
 
 fig.update_layout(
-    title="Ön Tasarım: Uçak İçi Sistem Yerleşimi Optimizasyonu (Titreşim Korumalı)",
+    title="Ön Tasarım: Uçak İçi Sistem Yerleşimi Optimizasyonu",
     scene=dict(
         xaxis=dict(title='Uzunluk (cm)', range=[0, GOVDE_UZUNLUK], backgroundcolor="rgb(240, 240, 240)"),
         yaxis=dict(title='Genişlik (cm)', range=[-200, 200]), # Kanatları kapsasın diye geniş
