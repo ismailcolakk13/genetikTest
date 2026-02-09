@@ -4,8 +4,6 @@ Created on Wed Nov  5 14:06:09 2025
 
 @author: ismai
 """
-# MATEMATIKSEL KONVANSIYONA GORE HESAPLAMALAR YAPILDI
-
 import copy
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -32,7 +30,23 @@ YAPISAL_KALINLIK = 2.0 # CM (Gövde kabuğu kalınlığı)
 BOLGE_BURUN_SON = 50.0 # Motor ve burun bombesi (Biraz uzattık)
 BOLGE_KUYRUK_BAS = 180.0 # Kabin bitişi, incelme başlangıcı
 
+MAX_YAKIT_AGIRLIGI = 35.0 # Tank tam doluyken eklenecek ekstra ağırlık
+DOLULUK_ORANLARI = [1.0, 0.0] # 1.0 = Dolu, 0.0 = Boş
+
+TITRESIM_LIMITI = 80.0 # cm (Hassas parçalar motora bundan daha yakın olmamalı)
+
+# (titresim_hassasiyeti eklendi)
 KOMPONENTLER_DB = [
+    # Motor titreşim kaynağıdır, hassas değildir (False)
+    {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN", "titresim_hassasiyeti": False}, 
+    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "SERBEST", "titresim_hassasiyeti": False},
+    # Aviyonikler hassastır (True)
+    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "SERBEST", "titresim_hassasiyeti": True},
+    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "SERBEST", "titresim_hassasiyeti": True},
+    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ", "titresim_hassasiyeti": False},
+    {"id": "Servo_Kuyruk","agirlik": 2.0,  "boyut": (5, 5, 5),    "sabit_bolge": "KUYRUK", "titresim_hassasiyeti": False},
+    # Kamera görüntü titrememeli, hassastır (True)
+    {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT", "titresim_hassasiyeti": True}, 
     # Motor KESİN SABİT (Locked).
     {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN", "sabit_pos": (30, 0, 0), "kilitli": True}, 
     {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "GOVDE", "kilitli": False},
@@ -198,8 +212,8 @@ def calculate_fitness_design(birey):
     puan = 0
     
     # 1. Çakışma Cezası
-    cakisma_sayisi = 0
-    keys = list(birey.yerlesim.keys())
+    cakisma_sayisi=0
+    keys=list(birey.yerlesim.keys())
     for i in range(len(keys)):
         for j in range(i+1, len(keys)):
             k1_id = keys[i]
@@ -223,6 +237,68 @@ def calculate_fitness_design(birey):
         if not govde_icinde_mi(pos, dim):
             tasma_sayisi += 1
             
+    puan-=tasma_sayisi*5000
+    
+    # YENİ EKLENEN: TİTREŞİM KONTROLÜ ---
+    # Motoru bul (Titreşim kaynağı)
+    pos_motor = birey.yerlesim["Motor"] 
+    
+    for k_id, pos in birey.yerlesim.items():
+        # DB'den parça özelliklerini çek
+        parca_db = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+        
+        # Eğer parça hassassa kontrol et
+        if parca_db.get("titresim_hassasiyeti") == True:
+            # Motora olan mesafeyi hesapla
+            mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
+            
+            # Limitten yakınsa ceza kes
+            if mesafe < TITRESIM_LIMITI:
+                ihlâl = TITRESIM_LIMITI - mesafe
+                puan -= (ihlâl ** 2) * 50 # Karesel ceza uyguluyoruz ki hızla uzaklaşsın
+
+    # 4. CG (Ağırlık Merkezi) Hesabı
+    toplam_cg_hatasi = 0
+    # Sadece raporlama için kullanılacak değişken
+    dolu_cg_coords = (0,0,0)
+    # Her bir doluluk senaryosu için ayrı CG hesapla
+    for doluluk in DOLULUK_ORANLARI:
+        total_mass = 0
+        moment_x = 0
+        moment_y = 0
+        moment_z = 0
+    
+        for k_id, pos in birey.yerlesim.items():
+            db_item = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+            mass = db_item["agirlik"]
+
+            # Yakıt tankı ise doluluk oranına göre ağırlık ekle
+            if k_id == "Yakit_Tanki":
+                mass += MAX_YAKIT_AGIRLIGI * doluluk
+
+            total_mass += mass
+            moment_x += mass * pos[0]
+            moment_y += mass * pos[1]
+            moment_z += mass * pos[2]
+        
+        cg_x = moment_x / total_mass
+        cg_y = moment_y / total_mass
+        cg_z = moment_z / total_mass
+        
+
+    # Eğer doluluk 1.0 ise bu koordinatları raporlama için sakla
+        if doluluk == 1.0:
+            dolu_cg_coords = (cg_x, cg_y, cg_z)
+
+
+        # Hedef CG'ye olan mesafe hatası
+        dist_error = ((cg_x - TARGET_CG_X)**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
+        toplam_cg_hatasi += dist_error
+
+    # Ortalama hatayı puandan düş (Ceza yöntemi)
+    puan -= (toplam_cg_hatasi / len(DOLULUK_ORANLARI)) * 1000
+
+    return puan, dolu_cg_coords
     puan -= tasma_sayisi * 10000 # Çakışma ile eşit ceza
     
     # 3. CG Hesaplama
@@ -322,6 +398,18 @@ for gen in range(GENERATIONS):
         child = mutate_design(child)
         yeni_pop.append(child)
         
+    populasyon=yeni_pop
+    
+en_iyi_tasarim=puanli_pop[0][1]
+# Analiz: Yakıt boşalırken CG ne kadar oynuyor?
+tank_pos = en_iyi_tasarim.yerlesim["Yakit_Tanki"]
+print(f"⛽ Yakıt Tankı Konumu: {tank_pos[0]:.1f} cm")
+
+#3d görsel
+def kutu_ciz(pos, dim, color, name):
+    # Plotly için bir kutunun köşe noktalarını ve yüzeylerini oluşturur
+    x, y, z = pos
+    dx, dy, dz = dim
     populasyon = yeni_pop
     
 en_iyi_tasarim = puanli_pop[0][1]
@@ -505,7 +593,14 @@ colors = ['red', 'blue', 'orange', 'purple', 'green', 'brown', 'cyan']
 idx = 0
 
 print("\n--- YERLEŞİM DETAYLARI ---")
+motor_pos = en_iyi_tasarim.yerlesim["Motor"] # Motor referansı
+
 for k_id, pos in en_iyi_tasarim.yerlesim.items():
+    # Boyut bilgisini DB'den çek
+    db_item = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+    boyut = db_item["boyut"]
+    
+    # Kutuyu çiz
     boyut = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)["boyut"]
     fig.add_trace(parca_kutusu_ciz(pos, boyut, colors[idx % len(colors)], k_id))
     
@@ -514,6 +609,44 @@ for k_id, pos in en_iyi_tasarim.yerlesim.items():
         mode='text', text=[k_id], textposition="top center",
         textfont=dict(size=10, color="black"), showlegend=False
     ))
+    
+    # Motora Uzaklığı Yazdır (Görsel kontrol için)
+    dist_motor = ((pos[0]-motor_pos[0])**2 + (pos[1]-motor_pos[1])**2 + (pos[2]-motor_pos[2])**2)**0.5
+    uyari = " (!)" if db_item["titresim_hassasiyeti"] and dist_motor < TITRESIM_LIMITI else ""
+    print(f"📍 {k_id}: X={pos[0]:.1f} | Motora Uzaklık: {dist_motor:.1f} cm {uyari}")
+    
+    idx += 1
+
+print("\n--- DENGE ANALİZİ ---")
+# En iyi birey için Dolu ve Boş durumları tekrar hesaplayalım
+tank_yer = en_iyi_tasarim.yerlesim["Yakit_Tanki"]
+cg_dolu = calculate_fitness_design(en_iyi_tasarim)[1] # Bu aslında son değeri döndürdüğü için yanıltabilir, manuel hesaplayalım:
+
+# Manuel doğrulama fonksiyonu (Hızlıca)
+def get_cg_for_fuel(birey, fuel_ratio):
+    t_mass, m_x = 0, 0
+    for k_id, pos in birey.yerlesim.items():
+        mass = next(i for i in KOMPONENTLER_DB if i["id"]==k_id)["agirlik"]
+        if k_id == "Yakit_Tanki": mass += MAX_YAKIT_AGIRLIGI * fuel_ratio
+        t_mass += mass
+        m_x += mass * pos[0]
+    return m_x / t_mass
+
+cg_dolu_x = get_cg_for_fuel(en_iyi_tasarim, 1.0)
+cg_bos_x = get_cg_for_fuel(en_iyi_tasarim, 0.0)
+
+print(f"Yakit Tanki Konumu (X): {tank_yer[0]:.2f} cm")
+print(f"CG (Dolu Depo)        : {cg_dolu_x:.2f} cm")
+print(f"CG (Bos Depo)         : {cg_bos_x:.2f} cm")
+print(f"CG Kaymasi (Drift)    : {abs(cg_dolu_x - cg_bos_x):.2f} cm")
+
+if abs(cg_dolu_x - cg_bos_x) < 2.0:
+    print("✅ MÜKEMMEL SONUÇ: Yakıt tüketimi dengeyi bozmuyor!")
+else:
+    print("⚠️ DİKKAT: Yakıt tüketimi dengeyi etkiliyor.")
+
+# 3. Ağırlık Merkezi (CG) Göstergeleri
+# Hedef CG
     print(f"📍 {k_id}: X={pos[0]:.1f}")
     idx += 1
 
