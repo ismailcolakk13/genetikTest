@@ -69,9 +69,9 @@ try:
     matrix[0, 3] = -nb_min[0]
     matrix[1, 3] = -(nb_min[1] + nb_max[1]) / 2
     
-    # Modelin bounding box'ı tekerleklerden (-111) kuyruğa (197) kadar uzanır.
-    # Tekerlekleri Z = -100'e oturtursak, kabinin zemini tam Z = 0'a hizalanır.
-    matrix[2, 3] = -nb_min[2] - 100 
+    # Modelin bounding box merkezini orijine oturtmak kabini Z=0 çevresine hizalar.
+    # Bu sayede Z ekseninde [-72, 72] aralığında yer alan matematiksel parçalar uçağın içinde kalır.
+    matrix[2, 3] = -(nb_min[2] + nb_max[2]) / 2 
     
     _scene.apply_transform(matrix)
     UCAK_MESH = _scene.to_geometry()
@@ -441,24 +441,49 @@ def ucak_govdesi_olustur():
         ))
     return traces
 
-def parca_kutusu_ciz(pos, dim, color, name):
-    """Komponentleri katı kutular olarak çizer"""
+def komponent_mesh_ciz(pos, dim, color, k_id):
+    """
+    Komponentlerin tipine göre daha gerçekçi 3D geometriler (Silindir, Kutu, vb.) oluşturur.
+    Önceden sadece keskin köşeli bir Box çiziliyordu.
+    """
     x, y, z = pos
     dx, dy, dz = dim
     
-    # Küp Köşeleri
-    x_k = [x-dx/2, x-dx/2, x+dx/2, x+dx/2, x-dx/2, x-dx/2, x+dx/2, x+dx/2]
-    y_k = [y-dy/2, y+dy/2, y+dy/2, y-dy/2, y-dy/2, y+dy/2, y+dy/2, y-dy/2]
-    z_k = [z-dz/2, z-dz/2, z-dz/2, z-dz/2, z+dz/2, z+dz/2, z+dz/2, z+dz/2]
+    # Parçaya özel geometri seçimi
+    if k_id == "Motor":
+        # Motor genelde yuvarlak bir bloğa benzer (Silindir)
+        radius = (dy + dz) / 4
+        mesh = trimesh.creation.cylinder(radius=radius, height=dx)
+        # trimesh silindiri Z ekseni boyunca oluşturur. Motor yatay durmalı (X yönünde).
+        rot = trimesh.transformations.rotation_matrix(np.pi/2, [0, 1, 0])
+        mesh.apply_transform(rot)
+        
+    elif k_id == "Yakit_Tanki":
+        # Yakıt tankı elipsoid veya yatay silindirik fıçıdır
+        radius = min(dy, dz) / 2
+        mesh = trimesh.creation.cylinder(radius=radius, height=dx)
+        rot = trimesh.transformations.rotation_matrix(np.pi/2, [0, 1, 0])
+        mesh.apply_transform(rot)
+        
+    elif k_id == "Payload_Kam":
+        # Kamera altına bakan bir küremsi dome (kapsül)
+        mesh = trimesh.creation.capsule(height=dx/2, radius=min(dy, dz)/2)
+        
+    else:
+        # Batarya, Aviyonik ve Servolar için kutu
+        mesh = trimesh.creation.box(extents=dim)
     
+    # Geometriyi konumuna taşı
+    transform = np.eye(4)
+    transform[:3, 3] = pos
+    mesh.apply_transform(transform)
+    
+    # Plotly'e gönder
     return go.Mesh3d(
-        x=x_k, y=y_k, z=z_k,
-        color=color, opacity=1.0, name=name,
-        # Küp yüzey tanımları (index based)
-        i = [7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2],
-        j = [3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3],
-        k = [0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
-        hoverinfo='name'
+        x=mesh.vertices[:, 0], y=mesh.vertices[:, 1], z=mesh.vertices[:, 2],
+        i=mesh.faces[:, 0], j=mesh.faces[:, 1], k=mesh.faces[:, 2],
+        color=color, opacity=1.0, name=k_id,
+        hoverinfo='name', flatshading=True
     )
 
 # --- GÖRSELLEŞTİRME BAŞLATIYORUZ ---
@@ -562,8 +587,8 @@ for k_id, pos in en_iyi_tasarim.yerlesim.items():
     # Boyut bilgisini DB'den çek
     boyut = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)["boyut"]
     
-    # Kutuyu çiz
-    fig.add_trace(parca_kutusu_ciz(pos, boyut, colors[idx % len(colors)], k_id))
+    # Kutuyu (veya silindiri) çiz
+    fig.add_trace(komponent_mesh_ciz(pos, boyut, colors[idx % len(colors)], k_id))
     
     # Etiket ekle (Havada asılı yazı)
     fig.add_trace(go.Scatter3d(
