@@ -21,19 +21,23 @@ TARGET_CG_X_MAX=130.0
 TARGET_CG_Y=0.0
 TARGET_CG_Z=0.0
 
+DOLULUK_ORANLARI = [0.0, 0.25, 0.5, 0.75, 1.0]
+MAX_YAKIT_AGIRLIGI = 50.0
+TITRESIM_LIMITI = 50.0
+
 # BÖLGE TANIMLARI (Sınırlar)
 BOLGE_BURUN_SON = 40.0
 BOLGE_KUYRUK_BAS = GOVDE_UZUNLUK - 40.0 # 260.0'dan sonrası kuyruk ucu
 
 KOMPONENTLER_DB = [
     # Motor artık KESİN SABİT (Locked). Burun ucunda sabit duruyor.
-    {"id": "Motor",       "agirlik": 80.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN", "sabit_pos": (30, 0, 0), "kilitli": True}, 
-    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "GOVDE", "kilitli": False}, # Artık serbest değil, gövde içinde
-    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False},
-    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False},
-    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ", "kilitli": False},
-    {"id": "Servo_Kuyruk","agirlik": 2.0,  "boyut": (5, 5, 5),    "sabit_bolge": "KUYRUK", "kilitli": False},
-    {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT", "kilitli": False}, # Kamera altta olur
+    {"id": "Motor",       "agirlik": 40.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN", "sabit_pos": (30, 0, 0), "kilitli": True, "titresim_hassasiyeti": False}, # Motorun kendisi titreşim kaynağı, kendisi hassas değil
+    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "GOVDE", "kilitli": False, "titresim_hassasiyeti": False}, # Artık serbest değil, gövde içinde
+    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
+    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
+    {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT", "kilitli": False, "titresim_hassasiyeti": True},
+    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ", "kilitli": False, "titresim_hassasiyeti": False},
+    {"id": "Servo_Kuyruk","agirlik": 2.0,  "boyut": (5, 5, 5),    "sabit_bolge": "KUYRUK", "kilitli": False, "titresim_hassasiyeti": False},
 ]
 
 #Çakışma kontrolü
@@ -232,38 +236,8 @@ def calculate_fitness_design(birey):
     puan -= (toplam_cg_hatasi / len(DOLULUK_ORANLARI)) * 1000
 
     return puan, dolu_cg_coords
-    puan -= tasma_sayisi * 10000 # Çakışma ile eşit ceza
-    
-    # 3. CG Hesaplama
-    total_mass = 0
-    moment_x = 0
-    moment_y = 0
-    moment_z = 0
-    
-    for k_id, pos in birey.yerlesim.items():
-        mass = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)["agirlik"]
-        total_mass += mass
-        moment_x += mass * pos[0]
-        moment_y += mass * pos[1]
-        moment_z += mass * pos[2]
-        
-    cg_x=moment_x/total_mass
-    cg_y=moment_y/total_mass
-    cg_z=moment_z/total_mass
-    
-    # CG X ekseninde aralık kontrolü
-    if cg_x < TARGET_CG_X_MIN:
-        dx = TARGET_CG_X_MIN - cg_x
-    elif cg_x > TARGET_CG_X_MAX:
-        dx = cg_x - TARGET_CG_X_MAX
-    else:
-        dx = 0.0 # Aralık içindeyse X hatası yok
-
-    dist_error=(dx**2 + (cg_y-TARGET_CG_Y)**2 + (cg_z-TARGET_CG_Z)**2)**0.5
-    
-    puan-=dist_error*100
-    
-    return puan,(cg_x,cg_y,cg_z)
+  
+   
 
 
 #genetik işlemler
@@ -463,7 +437,89 @@ for parca in ucak_parcalari:
 # 2. Optimize Edilen Komponentleri Çiz
 colors = ['red', 'blue', 'orange', 'purple', 'green', 'brown', 'cyan']
 idx = 0
+print("\n--- TASARIM ANALİZİ ---")
 
+# 1. CG Hedefe Yakınlık Kontrolü
+cg_x, cg_y, cg_z = best_cg
+# X ekseninde hedef aralığa göre sapma hesabı
+if cg_x < TARGET_CG_X_MIN:
+    dx = TARGET_CG_X_MIN - cg_x
+elif cg_x > TARGET_CG_X_MAX:
+    dx = cg_x - TARGET_CG_X_MAX
+else:
+    dx = 0.0
+
+# Toplam mesafe hatası (X aralığı, Y=0 ve Z=0 hedeflerine göre)
+dist_error = (dx**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
+
+if dist_error < 2.0:
+    print(f"✅ CG hedefe çok yakın (Sapma: {dist_error:.2f} cm)")
+elif dist_error < 15.0:
+    print(f"⚠️ CG hedefe orta mesafede (Sapma: {dist_error:.2f} cm)")
+else:
+    print(f"❌ CG hedeften uzak (Sapma: {dist_error:.2f} cm)")
+
+# 2. Yakıt Tankı Etkisi Kontrolü
+# Yakıt tankı ağırlık merkezinden (CG) ne kadar uzaksa, yakıt azaldıkça uçağın dengesi o kadar bozulur.
+yakit_pos = en_iyi_tasarim.yerlesim.get("Yakit_Tanki", (0, 0, 0))
+hedef_merkez_x = (TARGET_CG_X_MIN + TARGET_CG_X_MAX) / 2
+
+if abs(yakit_pos[0] - hedef_merkez_x) > 10.0:
+    print(f"⛽ Yakıt tankının X konumu ({yakit_pos[0]:.1f}) ideal merkezden uzak. Yakıt tüketimi CG'yi ETKİLEYECEK.")
+else:
+    print(f"⛽ Yakıt tankı ideal merkeze çok yakın. Yakıt tüketiminin dengeye etkisi MİNİMUM.")
+
+# 3. Genel Skor Yorumu
+# Ceza sistemi olduğu için skor 0'a ne kadar yakınsa (negatif değerler) o kadar iyidir.
+if best_score > -2000:
+    print(f"🏆 Tasarım çok iyi (Skor: {best_score:.0f})")
+elif best_score > -6000:
+    print(f"👍 Tasarım kabul edilebilir (Skor: {best_score:.0f})")
+else:
+    print(f"🚫 Tasarım zayıf (Skor: {best_score:.0f})")
+print("\n--- DENGE ANALİZİ (CG DRIFT) ---")
+
+# Denge Analizi Hesaplamaları (Sadece X ekseni için)
+bos_agirlik = 0
+bos_moment_x = 0
+dolu_agirlik = 0
+dolu_moment_x = 0
+
+for k_id, pos in en_iyi_tasarim.yerlesim.items():
+    db_item = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+    mass = db_item["agirlik"]
+
+    # Bos depo için moment (Yakıt = 0)
+    bos_agirlik += mass
+    bos_moment_x += mass * pos[0]
+
+    # Dolu depo için moment (Yakıt = MAX)
+    if k_id == "Yakit_Tanki":
+        dolu_agirlik += (mass + MAX_YAKIT_AGIRLIGI)
+        dolu_moment_x += (mass + MAX_YAKIT_AGIRLIGI) * pos[0]
+    else:
+        dolu_agirlik += mass
+        dolu_moment_x += mass * pos[0]
+
+cg_bos_x = bos_moment_x / bos_agirlik
+cg_dolu_x = dolu_moment_x / dolu_agirlik
+cg_kaymasi = abs(cg_dolu_x - cg_bos_x)
+
+yakit_pos_x = en_iyi_tasarim.yerlesim.get("Yakit_Tanki", (0, 0, 0))[0]
+
+print(f"Yakit Tanki Konumu (X): {yakit_pos_x:.2f} cm")
+print(f"CG (Dolu Depo)        : {cg_dolu_x:.2f} cm")
+print(f"CG (Bos Depo)         : {cg_bos_x:.2f} cm")
+print(f"CG Kaymasi (Drift)    : {cg_kaymasi:.2f} cm")
+
+# Uyarı Mekanizması
+if cg_kaymasi > 5.0:
+    print("❌ KRİTİK: Yakıt tüketimi CG'yi çok fazla kaydırıyor! Uçuş stabilitesi tehlikede.")
+elif cg_kaymasi > 2.0:
+    print("⚠️ DİKKAT: Yakıt tüketimi dengeyi etkiliyor. Trim ayarı gerekecek.")
+else:
+    print("✅ MÜKEMMEL: Yakıt tankı ideal konumda. Yakıt tüketiminin dengeye etkisi minimum.")
+print("-----------------------\n")
 print("\n--- YERLEŞİM DETAYLARI ---")
 motor_pos = en_iyi_tasarim.yerlesim["Motor"] # Motor referansı
 
