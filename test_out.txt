@@ -1,0 +1,8 @@
+optimizasyon baþlýyor...
+Nesil 0: Puan 4057 | CG X: 109.1 (Hedef: 110.0-130.0)
+Nesil 10: Puan 19684 | CG X: 123.5 (Hedef: 110.0-130.0)
+Nesil 20: Puan 19733 | CG X: 123.9 (Hedef: 110.0-130.0)
+Nesil 30: Puan 19777 | CG X: 123.0 (Hedef: 110.0-130.0)
+Nesil 40: Puan 19777 | CG X: 123.0 (Hedef: 110.0-130.0)
+
+--- TASARIM ANALÝZÝ ---

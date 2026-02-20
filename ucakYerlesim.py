@@ -2,7 +2,7 @@
 """
 Created on Wed Nov  5 14:06:09 2025
 
-@author: ismai
+@authors: İsmail Çolak, Yusuf Eren Aykurt, Mehmet Can Çalışkan
 """
 import copy
 import matplotlib.patches as patches
@@ -11,34 +11,77 @@ import random
 from mpl_toolkits.mplot3d import Axes3D
 import plotly.graph_objects as go
 import numpy as np
+import trimesh
 
-GOVDE_UZUNLUK=300.0 #CM (x ekseni)
-GOVDE_CAP=60.0 # CM (y ve z ekseni genişliği)
-GOVDE_YARICAP=GOVDE_CAP/2
+# CESSNA 172 REALISTIC DIMENSIONS (cm) and WEIGHTS (kg)
+GOVDE_UZUNLUK = 828.0 # CM (x ekseni, gerçeğe yakın uzunluk)
+GOVDE_CAP = 120.0 # CM (Kabin genişliği)
+GOVDE_YARICAP = GOVDE_CAP / 2
 
-TARGET_CG_X_MIN=110.0
-TARGET_CG_X_MAX=130.0
-TARGET_CG_Y=0.0
-TARGET_CG_Z=0.0
+# Cessna CG referansı genellikle firewall veya pervaneden alınır. 
+# Kanatların ortalarına denk gelmesi için X = 230 - 270 cm arası idealdir.
+TARGET_CG_X_MIN = 230.0
+TARGET_CG_X_MAX = 270.0
+TARGET_CG_Y = 0.0
+TARGET_CG_Z = 0.0
 
 DOLULUK_ORANLARI = [0.0, 0.25, 0.5, 0.75, 1.0]
-MAX_YAKIT_AGIRLIGI = 50.0
-TITRESIM_LIMITI = 50.0
+MAX_YAKIT_AGIRLIGI = 150.0 # Yaklaşık 56 galon (212 litre) avgas
+TITRESIM_LIMITI = 100.0 # Gerçek boyutta mesafe arttı
 
 # BÖLGE TANIMLARI (Sınırlar)
-BOLGE_BURUN_SON = 40.0
-BOLGE_KUYRUK_BAS = GOVDE_UZUNLUK - 40.0 # 260.0'dan sonrası kuyruk ucu
+BOLGE_BURUN_SON = 120.0 # Motor kabini (Cowling) payı
+BOLGE_KUYRUK_BAS = 680.0 # Gövdenin arka daralma noktası
 
 KOMPONENTLER_DB = [
-    # Motor artık KESİN SABİT (Locked). Burun ucunda sabit duruyor.
-    {"id": "Motor",       "agirlik": 40.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN", "sabit_pos": (30, 0, 0), "kilitli": True, "titresim_hassasiyeti": False}, # Motorun kendisi titreşim kaynağı, kendisi hassas değil
-    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "GOVDE", "kilitli": False, "titresim_hassasiyeti": False}, # Artık serbest değil, gövde içinde
-    {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
-    {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
-    {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT", "kilitli": False, "titresim_hassasiyeti": True},
-    {"id": "Yakit_Tanki", "agirlik": 40.0, "boyut": (50, 40, 30), "sabit_bolge": "MERKEZ", "kilitli": False, "titresim_hassasiyeti": False},
-    {"id": "Servo_Kuyruk","agirlik": 2.0,  "boyut": (5, 5, 5),    "sabit_bolge": "KUYRUK", "kilitli": False, "titresim_hassasiyeti": False},
+    # Gerçek boyutlara, ağırlıklara kalibre edildi
+    {"id": "Motor",       "agirlik": 130.0,"boyut": (80, 80, 80), "sabit_bolge": "BURUN", "sabit_pos": (60, 0, 0), "kilitli": True, "titresim_hassasiyeti": False}, 
+    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (25, 20, 20), "sabit_bolge": "BURUN", "kilitli": False, "titresim_hassasiyeti": False}, # Genelde firewall arkasında
+    {"id": "Aviyonik_1",  "agirlik": 10.0, "boyut": (30, 30, 20), "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
+    {"id": "Aviyonik_2",  "agirlik": 10.0, "boyut": (30, 30, 20), "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
+    {"id": "Payload_Kam", "agirlik": 50.0, "boyut": (50, 50, 50), "sabit_bolge": "ON_ALT", "kilitli": False, "titresim_hassasiyeti": True}, # Büyük bir gözetleme kamerası
+    {"id": "Yakit_Tanki", "agirlik": 30.0, "boyut": (100, 80, 40),"sabit_bolge": "MERKEZ", "kilitli": False, "titresim_hassasiyeti": False}, # Kanat veya merkezi ek depo
+    {"id": "Servo_Kuyruk","agirlik": 5.0,  "boyut": (15, 15, 15), "sabit_bolge": "KUYRUK", "kilitli": False, "titresim_hassasiyeti": False},
 ]
+
+KOMPONENTLER_DICT = {comp["id"]: comp for comp in KOMPONENTLER_DB}
+
+# --- GLOBAL 3D MODEL YÜKLEME VE ÇARPIŞMA (COLLISION) MOTORU HIZIRLIĞI ---
+UCAK_MESH = None
+UCAK_COLLISION_MANAGER = None
+
+try:
+    print("3D Model yükleniyor (Çarpışma Motoru ve UI için)...")
+    _scene = trimesh.load('cessna-172.glb', force='scene')
+    
+    rot_x = trimesh.transformations.rotation_matrix(np.pi/2, [1, 0, 0])
+    _scene.apply_transform(rot_x)
+    
+    b_min, b_max = _scene.bounds
+    scale_factor = GOVDE_UZUNLUK / (b_max[0] - b_min[0])
+    
+    matrix = np.eye(4)
+    matrix[:3, :3] *= scale_factor
+    
+    nb_min = b_min * scale_factor
+    nb_max = b_max * scale_factor
+    
+    matrix[0, 3] = -nb_min[0]
+    matrix[1, 3] = -(nb_min[1] + nb_max[1]) / 2
+    
+    # Modelin bounding box'ı tekerleklerden (-111) kuyruğa (197) kadar uzanır.
+    # Tekerlekleri Z = -100'e oturtursak, kabinin zemini tam Z = 0'a hizalanır.
+    matrix[2, 3] = -nb_min[2] - 100 
+    
+    _scene.apply_transform(matrix)
+    UCAK_MESH = _scene.to_geometry()
+    
+    UCAK_COLLISION_MANAGER = trimesh.collision.CollisionManager()
+    UCAK_COLLISION_MANAGER.add_object('Ucak_Govde', UCAK_MESH)
+    print("✅ Çarpışma Motoru (FCL) Aktif: Gerçekçi duvar temasları test edilecek.")
+except Exception as e:
+    print(f"Uyarı: 3D Model çarpışma için yüklenemedi: {e}")
+
 
 #Çakışma kontrolü
 def kutular_cakisiyor_mu(pos1,dim1,pos2,dim2):
@@ -67,13 +110,13 @@ def get_fuselage_radius(x):
     if x < BOLGE_BURUN_SON: 
         # Burun kısmı (Parabolik artış)
         return (x/BOLGE_BURUN_SON)**0.5 * GOVDE_YARICAP
-    elif x < 180:  
+    elif x < GOVDE_UZUNLUK / 2:  
         # Orta gövde (Sabit silindir)
         return GOVDE_YARICAP
     else: 
         # Kuyruk kısmı (Lineer incelme)
-        # 180'den 300'e giderken yarıçap %100'den %20'ye düşüyor
-        ratio = (x - 180) / (GOVDE_UZUNLUK - 180)
+        # Orta noktadan arkaya doğru yarıçap daralıyor
+        ratio = (x - (GOVDE_UZUNLUK / 2)) / (GOVDE_UZUNLUK / 2)
         return GOVDE_YARICAP * (1 - ratio * 0.8)
 
 #Gövdeden taşma kontrolü (Genelleştirilmiş)
@@ -145,7 +188,7 @@ class TasarimBireyi:
             self.yerlesim[komp["id"]]=(x,y,z)
             
 def calculate_fitness_design(birey):
-    puan=0
+    puan = 0.0
     
     #çakışma
     cakisma_sayisi=0
@@ -155,8 +198,8 @@ def calculate_fitness_design(birey):
             k1_id=keys[i]
             k2_id=keys[j]
             
-            dim1=next(item for item in KOMPONENTLER_DB if item["id"]==k1_id)["boyut"]
-            dim2=next(item for item in KOMPONENTLER_DB if item["id"]==k2_id)["boyut"]
+            dim1=KOMPONENTLER_DICT[k1_id]["boyut"]
+            dim2=KOMPONENTLER_DICT[k2_id]["boyut"]
             
             pos1=birey.yerlesim[k1_id]
             pos2=birey.yerlesim[k2_id]
@@ -164,24 +207,63 @@ def calculate_fitness_design(birey):
             if(kutular_cakisiyor_mu(pos1, dim1, pos2, dim2)):
                 cakisma_sayisi+=1
     
-    puan-=cakisma_sayisi*10000
+    puan-=cakisma_sayisi*15000  # Hard constraint: Ağır ceza
     
-    #gövdeden taşma
+    #gövdeden taşma (Basit matematiksel kontrol - Parça uçağın tamamen dışında mı?)
     tasma_sayisi=0
     for k_id,pos in birey.yerlesim.items():
-        dim=next(item for item in KOMPONENTLER_DB if item["id"]==k_id)["boyut"]
+        dim=KOMPONENTLER_DICT[k_id]["boyut"]
         if not govde_icinde_mi(pos, dim):
             tasma_sayisi+=1
             
-    puan-=tasma_sayisi*5000
+    puan-=tasma_sayisi*15000    # Hard constraint: Ağır ceza
     
+    # 3D MODEL DUVAR TEMASI (Clipping) KONTROLÜ (Gerçekçi FCL Çarpışma)
+    if UCAK_COLLISION_MANAGER is not None:
+        duvar_temas_sayisi = 0
+        for k_id, pos in birey.yerlesim.items():
+            dim = KOMPONENTLER_DICT[k_id]["boyut"]
+            
+            # Kutuyu oluştur ve pozisyona taşı
+            transform = np.eye(4)
+            transform[:3, 3] = pos
+            box = trimesh.creation.box(extents=dim, transform=transform)
+            
+            # Uçak zırhı (mesh) ile kesişiyor mu?
+            if UCAK_COLLISION_MANAGER.in_collision_single(box):
+                duvar_temas_sayisi += 1
+                
+        puan -= duvar_temas_sayisi * 15000 # Hard constraint: Duvara değen parça reddedilir
+    
+    # Sabit Bölge (Region) İhlali Kontrolü (Hard Constraint)
+    bolge_ihlali_sayisi = 0
+    for k_id, pos in birey.yerlesim.items():
+        parca_db = KOMPONENTLER_DICT[k_id]
+        bolge = parca_db.get("sabit_bolge", "")
+        
+        x, y, z = pos
+        if bolge == "BURUN" and x > BOLGE_BURUN_SON:
+            bolge_ihlali_sayisi += 1
+        elif bolge == "KUYRUK" and x < BOLGE_KUYRUK_BAS:
+            bolge_ihlali_sayisi += 1
+        elif bolge == "MERKEZ":
+            center_x = (TARGET_CG_X_MIN + TARGET_CG_X_MAX) / 2
+            if abs(x - center_x) > 40:
+                bolge_ihlali_sayisi += 1
+        elif bolge == "GOVDE" and (x < BOLGE_BURUN_SON or x > BOLGE_KUYRUK_BAS):
+            bolge_ihlali_sayisi += 1
+        elif bolge == "ON_ALT" and z > -GOVDE_YARICAP/2 + 10: 
+            bolge_ihlali_sayisi += 1
+            
+    puan -= bolge_ihlali_sayisi * 15000  # Hard constraint
+
     # YENİ EKLENEN: TİTREŞİM KONTROLÜ ---
     # Motoru bul (Titreşim kaynağı)
     pos_motor = birey.yerlesim["Motor"] 
     
     for k_id, pos in birey.yerlesim.items():
         # DB'den parça özelliklerini çek
-        parca_db = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+        parca_db = KOMPONENTLER_DICT[k_id]
         
         # Eğer parça hassassa kontrol et
         if parca_db.get("titresim_hassasiyeti") == True:
@@ -191,31 +273,47 @@ def calculate_fitness_design(birey):
             # Limitten yakınsa ceza kes
             if mesafe < TITRESIM_LIMITI:
                 ihlâl = TITRESIM_LIMITI - mesafe
-                puan -= (ihlâl ** 2) * 50 # Karesel ceza uyguluyoruz ki hızla uzaklaşsın
+                puan -= (ihlâl ** 2) * 5 # Soft ceza (Gradient)
 
     # 4. CG (Ağırlık Merkezi) Hesabı
     toplam_cg_hatasi = 0
     # Sadece raporlama için kullanılacak değişken
     dolu_cg_coords = (0,0,0)
+    
+    # Optimizasyon: Sabit kütle ve momentleri döngü dışına çıkar
+    static_mass = 0
+    static_moment_x = 0
+    static_moment_y = 0
+    static_moment_z = 0
+    yakit_pos = (0, 0, 0)
+    
+    for k_id, pos in birey.yerlesim.items():
+        db_item = KOMPONENTLER_DICT[k_id]
+        mass = db_item["agirlik"]
+        
+        if k_id == "Yakit_Tanki":
+            yakit_pos = pos
+        else:
+            static_mass += mass
+            static_moment_x += mass * pos[0]
+            static_moment_y += mass * pos[1]
+            static_moment_z += mass * pos[2]
+
     # Her bir doluluk senaryosu için ayrı CG hesapla
     for doluluk in DOLULUK_ORANLARI:
-        total_mass = 0
-        moment_x = 0
-        moment_y = 0
-        moment_z = 0
-    
-        for k_id, pos in birey.yerlesim.items():
-            db_item = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
-            mass = db_item["agirlik"]
-
-            # Yakıt tankı ise doluluk oranına göre ağırlık ekle
-            if k_id == "Yakit_Tanki":
-                mass += MAX_YAKIT_AGIRLIGI * doluluk
-
-            total_mass += mass
-            moment_x += mass * pos[0]
-            moment_y += mass * pos[1]
-            moment_z += mass * pos[2]
+        yakit_mass = MAX_YAKIT_AGIRLIGI * doluluk
+        
+        if "Yakit_Tanki" in birey.yerlesim:
+            tank_base_mass = KOMPONENTLER_DICT["Yakit_Tanki"]["agirlik"]
+            total_mass = static_mass + tank_base_mass + yakit_mass
+            moment_x = static_moment_x + (tank_base_mass + yakit_mass) * yakit_pos[0]
+            moment_y = static_moment_y + (tank_base_mass + yakit_mass) * yakit_pos[1]
+            moment_z = static_moment_z + (tank_base_mass + yakit_mass) * yakit_pos[2]
+        else:
+            total_mass = static_mass
+            moment_x = static_moment_x
+            moment_y = static_moment_y
+            moment_z = static_moment_z
         
         cg_x = moment_x / total_mass
         cg_y = moment_y / total_mass
@@ -232,8 +330,8 @@ def calculate_fitness_design(birey):
         dist_error = ((cg_x - target_x_center)**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
         toplam_cg_hatasi += dist_error
 
-    # Ortalama hatayı puandan düş (Ceza yöntemi)
-    puan -= (toplam_cg_hatasi / len(DOLULUK_ORANLARI)) * 1000
+    # Ortalama hatayı puandan düş (Soft ceza)
+    puan -= (toplam_cg_hatasi / len(DOLULUK_ORANLARI)) * 100
 
     return puan, dolu_cg_coords
   
@@ -255,7 +353,7 @@ def crossover_design(parent1, parent2):
 def mutate_design(birey, rate=0.1):
     for k_id in birey.yerlesim:
         # Kilitli parçaları mutasyona uğratma
-        comp_info = next((item for item in KOMPONENTLER_DB if item["id"] == k_id), None)
+        comp_info = KOMPONENTLER_DICT.get(k_id)
         if comp_info and comp_info.get("kilitli", False):
             continue
 
@@ -331,79 +429,16 @@ def kutu_ciz(pos, dim, color, name):
 
 def ucak_govdesi_olustur():
     """
-    Cessna benzeri basit bir uçak geometrisi (Mesh) oluşturur.
-    Gövde Uzunluğu: 300 birim (Global değişkenden alınır)
+    Cessna 172 Global Modelini (UCAK_MESH) Plotly Mesh3d nesnelerine çevirir.
     """
     traces = []
-    
-    # 1. GÖVDE (FUSELAGE) - Aerodinamik bir tüp
-    # Burun (0) -> Kabin (50-150) -> Kuyruk (300)
-    u = np.linspace(0, 2 * np.pi, 20)
-    v = np.linspace(0, GOVDE_UZUNLUK, 40)
-    u, v = np.meshgrid(u, v)
-    
-    # Gövde şeklini belirleyen yarıçap fonksiyonu (Tapering)
-    # Artık merkezi fonksiyonu kullanıyoruz
-    
-    r_values = np.array([get_fuselage_radius(x) for x in v.flatten()]).reshape(v.shape)
-    
-    x_govde = v
-    y_govde = r_values * np.cos(u)
-    z_govde = r_values * np.sin(u) * 1.2 # Yükseklik biraz daha eliptik olsun
-    
-    # Gövdeyi Yarı Şeffaf Çiz
-    traces.append(go.Surface(
-        x=x_govde, y=y_govde, z=z_govde,
-        opacity=0.15, colorscale='Greys', showscale=False, name='Gövde', hoverinfo='skip'
-    ))
-    
-    # Gövde Tel Kafes (Wireframe) çizgileri (Daha teknik görünüm için)
-    # Sadece belli kesitleri çiz
-    for i in range(0, 40, 4): 
-        traces.append(go.Scatter3d(
-            x=x_govde[i], y=y_govde[i], z=z_govde[i],
-            mode='lines', line=dict(color='black', width=1), showlegend=False, hoverinfo='skip'
+    if UCAK_MESH is not None:
+        traces.append(go.Mesh3d(
+            x=UCAK_MESH.vertices[:, 0], y=UCAK_MESH.vertices[:, 1], z=UCAK_MESH.vertices[:, 2],
+            i=UCAK_MESH.faces[:, 0], j=UCAK_MESH.faces[:, 1], k=UCAK_MESH.faces[:, 2],
+            color='lightblue', opacity=0.3, name="Cessna 172",
+            hoverinfo='skip', flatshading=True
         ))
-
-    # 2. KANATLAR (WINGS) - High Wing Cessna Tipi
-    kanat_x_bas = 80
-    kanat_genislik = 40 # Chord
-    kanat_uzunluk = 360 # Span (Gövdeden taşan)
-    z_kanat = GOVDE_YARICAP * 1.1 # Gövdenin üstünde
-    
-    x_w = [kanat_x_bas, kanat_x_bas+kanat_genislik, kanat_x_bas+kanat_genislik, kanat_x_bas]
-    y_w = [-kanat_uzunluk/2, -kanat_uzunluk/2, kanat_uzunluk/2, kanat_uzunluk/2]
-    z_w = [z_kanat, z_kanat, z_kanat, z_kanat]
-    
-    traces.append(go.Mesh3d(
-        x=x_w, y=y_w, z=z_w,
-        color='lightblue', opacity=0.5, name='Kanat',
-        i=[0, 0], j=[1, 2], k=[2, 3] # Yüzey örme indeksleri
-    ))
-
-    # 3. KUYRUK TAKIMI (TAIL)
-    # Yatay Stabilize
-    tail_x = GOVDE_UZUNLUK - 40
-    h_stab_span = 120
-    x_h = [tail_x, GOVDE_UZUNLUK, GOVDE_UZUNLUK, tail_x]
-    y_h = [-h_stab_span/2, -h_stab_span/2, h_stab_span/2, h_stab_span/2]
-    z_h = [0, 0, 0, 0]
-    
-    traces.append(go.Mesh3d(
-        x=x_h, y=y_h, z=z_h, color='lightblue', opacity=0.5, name='Yatay Kuyruk',
-        i=[0, 0], j=[1, 2], k=[2, 3]
-    ))
-    
-    # Dikey Stabilize (Rudder)
-    x_v = [tail_x, GOVDE_UZUNLUK, GOVDE_UZUNLUK, tail_x+10]
-    y_v = [0, 0, 0, 0]
-    z_v = [0, 0, 50, 50] # 50 birim yukarı
-    
-    traces.append(go.Mesh3d(
-        x=x_v, y=y_v, z=z_v, color='lightblue', opacity=0.5, name='Dikey Kuyruk',
-        i=[0, 0], j=[1, 2], k=[2, 3]
-    ))
-
     return traces
 
 def parca_kutusu_ciz(pos, dim, color, name):
@@ -486,7 +521,7 @@ dolu_agirlik = 0
 dolu_moment_x = 0
 
 for k_id, pos in en_iyi_tasarim.yerlesim.items():
-    db_item = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+    db_item = KOMPONENTLER_DICT[k_id]
     mass = db_item["agirlik"]
 
     # Bos depo için moment (Yakıt = 0)
@@ -592,9 +627,9 @@ camera = dict(
 fig.update_layout(
     title="Ön Tasarım: Uçak İçi Sistem Yerleşimi Optimizasyonu",
     scene=dict(
-        xaxis=dict(title='Uzunluk (cm)', range=[0, GOVDE_UZUNLUK], backgroundcolor="rgb(240, 240, 240)"),
-        yaxis=dict(title='Genişlik (cm)', range=[-200, 200]), # Kanatları kapsasın diye geniş
-        zaxis=dict(title='Yükseklik (cm)', range=[-100, 100]),
+        xaxis=dict(title='Uzunluk (cm)', backgroundcolor="rgb(240, 240, 240)"),
+        yaxis=dict(title='Genişlik (cm)'),
+        zaxis=dict(title='Yükseklik (cm)'),
         aspectmode='data', # Gerçek oranları koru (Uçak basık görünmesin)
         camera=camera
     ),

@@ -1,0 +1,29 @@
+optimizasyon başlıyor...
+Nesil 0: Puan 3067 | CG X: 103.2 (Hedef: 110.0-130.0)
+Nesil 10: Puan 34804 | CG X: 121.6 (Hedef: 110.0-130.0)
+Nesil 20: Puan 34976 | CG X: 120.0 (Hedef: 110.0-130.0)
+Nesil 30: Puan 34978 | CG X: 119.9 (Hedef: 110.0-130.0)
+Nesil 40: Puan 34979 | CG X: 119.9 (Hedef: 110.0-130.0)
+
+--- TASARIM ANALİZİ ---
+✅ CG hedefe çok yakın (Sapma: 0.29 cm)
+⛽ Yakıt tankı ideal merkeze çok yakın. Yakıt tüketiminin dengeye etkisi MİNİMUM.
+🏆 Tasarım çok iyi (Skor: 34979)
+
+--- DENGE ANALİZİ (CG DRIFT) ---
+Yakit Tanki Konumu (X): 119.65 cm
+CG (Dolu Depo)        : 119.95 cm
+CG (Bos Depo)         : 120.08 cm
+CG Kaymasi (Drift)    : 0.13 cm
+✅ MÜKEMMEL: Yakıt tankı ideal konumda. Yakıt tüketiminin dengeye etkisi minimum.
+-----------------------
+
+
+--- YERLEŞİM DETAYLARI ---
+📍 Motor: Gövde Başından 30.0 cm geride.
+📍 Batarya_Ana: Gövde Başından 228.5 cm geride.
+📍 Aviyonik_1: Gövde Başından 252.7 cm geride.
+📍 Aviyonik_2: Gövde Başından 222.6 cm geride.
+📍 Payload_Kam: Gövde Başından 173.2 cm geride.
+📍 Yakit_Tanki: Gövde Başından 119.6 cm geride.
+📍 Servo_Kuyruk: Gövde Başından 263.9 cm geride.
