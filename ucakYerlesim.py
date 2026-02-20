@@ -169,20 +169,83 @@ def calculate_fitness_design(birey):
         if not govde_icinde_mi(pos, dim):
             tasma_sayisi+=1
             
-    puan-=tasma_sayisi*10000
+    puan-=tasma_sayisi*5000
     
-    #cg hesaplama
-    total_mass=0
-    moment_x=0
-    moment_y=0
-    moment_z=0
+    # YENİ EKLENEN: TİTREŞİM KONTROLÜ ---
+    # Motoru bul (Titreşim kaynağı)
+    pos_motor = birey.yerlesim["Motor"] 
     
-    for k_id,pos in birey.yerlesim.items():
-        mass=next(item for item in KOMPONENTLER_DB if item["id"]==k_id)["agirlik"]
-        total_mass+=mass
-        moment_x+=mass*pos[0]
-        moment_y+=mass*pos[1]
-        moment_z+=mass*pos[2]
+    for k_id, pos in birey.yerlesim.items():
+        # DB'den parça özelliklerini çek
+        parca_db = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+        
+        # Eğer parça hassassa kontrol et
+        if parca_db.get("titresim_hassasiyeti") == True:
+            # Motora olan mesafeyi hesapla
+            mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
+            
+            # Limitten yakınsa ceza kes
+            if mesafe < TITRESIM_LIMITI:
+                ihlâl = TITRESIM_LIMITI - mesafe
+                puan -= (ihlâl ** 2) * 50 # Karesel ceza uyguluyoruz ki hızla uzaklaşsın
+
+    # 4. CG (Ağırlık Merkezi) Hesabı
+    toplam_cg_hatasi = 0
+    # Sadece raporlama için kullanılacak değişken
+    dolu_cg_coords = (0,0,0)
+    # Her bir doluluk senaryosu için ayrı CG hesapla
+    for doluluk in DOLULUK_ORANLARI:
+        total_mass = 0
+        moment_x = 0
+        moment_y = 0
+        moment_z = 0
+    
+        for k_id, pos in birey.yerlesim.items():
+            db_item = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
+            mass = db_item["agirlik"]
+
+            # Yakıt tankı ise doluluk oranına göre ağırlık ekle
+            if k_id == "Yakit_Tanki":
+                mass += MAX_YAKIT_AGIRLIGI * doluluk
+
+            total_mass += mass
+            moment_x += mass * pos[0]
+            moment_y += mass * pos[1]
+            moment_z += mass * pos[2]
+        
+        cg_x = moment_x / total_mass
+        cg_y = moment_y / total_mass
+        cg_z = moment_z / total_mass
+        
+
+    # Eğer doluluk 1.0 ise bu koordinatları raporlama için sakla
+        if doluluk == 1.0:
+            dolu_cg_coords = (cg_x, cg_y, cg_z)
+
+        target_x_center = (TARGET_CG_X_MIN + TARGET_CG_X_MAX) / 2
+
+        # Hedef CG'ye olan mesafe hatası
+        dist_error = ((cg_x - target_x_center)**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
+        toplam_cg_hatasi += dist_error
+
+    # Ortalama hatayı puandan düş (Ceza yöntemi)
+    puan -= (toplam_cg_hatasi / len(DOLULUK_ORANLARI)) * 1000
+
+    return puan, dolu_cg_coords
+    puan -= tasma_sayisi * 10000 # Çakışma ile eşit ceza
+    
+    # 3. CG Hesaplama
+    total_mass = 0
+    moment_x = 0
+    moment_y = 0
+    moment_z = 0
+    
+    for k_id, pos in birey.yerlesim.items():
+        mass = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)["agirlik"]
+        total_mass += mass
+        moment_x += mass * pos[0]
+        moment_y += mass * pos[1]
+        moment_z += mass * pos[2]
         
     cg_x=moment_x/total_mass
     cg_y=moment_y/total_mass
