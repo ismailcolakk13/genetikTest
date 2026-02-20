@@ -290,9 +290,10 @@ def calculate_fitness_design(birey):
         if doluluk == 1.0:
             dolu_cg_coords = (cg_x, cg_y, cg_z)
 
+        target_x_center = (TARGET_CG_X_MIN + TARGET_CG_X_MAX) / 2
 
         # Hedef CG'ye olan mesafe hatası
-        dist_error = ((cg_x - TARGET_CG_X)**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
+        dist_error = ((cg_x - target_x_center)**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
         toplam_cg_hatasi += dist_error
 
     # Ortalama hatayı puandan düş (Ceza yöntemi)
