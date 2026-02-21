@@ -35,7 +35,7 @@ BOLGE_KUYRUK_BAS = 680.0 # Gövdenin arka daralma noktası
 
 KOMPONENTLER_DB = [
     # Gerçek boyutlara, ağırlıklara kalibre edildi
-    {"id": "Motor",       "agirlik": 130.0,"boyut": (80, 60, 60), "sabit_bolge": "BURUN", "sabit_pos": (40, 0, 0), "kilitli": True, "titresim_hassasiyeti": False}, 
+    {"id": "Motor",       "agirlik": 130.0,"boyut": (80, 25, 25), "sabit_bolge": "BURUN", "sabit_pos": (50, 0, -5), "kilitli": True, "titresim_hassasiyeti": False}, 
     {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (25, 20, 20), "sabit_bolge": "BURUN", "kilitli": False, "titresim_hassasiyeti": False}, # Genelde firewall arkasında
     {"id": "Aviyonik_1",  "agirlik": 10.0, "boyut": (30, 30, 20), "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
     {"id": "Aviyonik_2",  "agirlik": 10.0, "boyut": (30, 30, 20), "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
@@ -46,6 +46,31 @@ KOMPONENTLER_DB = [
 ]
 
 KOMPONENTLER_DICT = {comp["id"]: comp for comp in KOMPONENTLER_DB}
+
+# Sürekli rotasyon desteği (Euler açıları rx, ry, rz)
+def rotation_matrix_3d(rx, ry, rz):
+    """3D rotasyon matrisi (Euler açıları, radyan)."""
+    cx, sx = np.cos(rx), np.sin(rx)
+    cy, sy = np.cos(ry), np.sin(ry)
+    cz, sz = np.cos(rz), np.sin(rz)
+    Rx = np.array([[1,0,0],[0,cx,-sx],[0,sx,cx]])
+    Ry = np.array([[cy,0,sy],[0,1,0],[-sy,0,cy]])
+    Rz = np.array([[cz,-sz,0],[sz,cz,0],[0,0,1]])
+    return Rz @ Ry @ Rx
+
+def get_rotated_aabb(boyut, rotation):
+    """Döndürülmüş kutunun eksen-hizalı bounding box boyutlarını hesaplar."""
+    rx, ry, rz = rotation
+    dx, dy, dz = boyut
+    hx, hy, hz = dx/2, dy/2, dz/2
+    corners = np.array([
+        [-hx,-hy,-hz],[-hx,-hy,hz],[-hx,hy,-hz],[-hx,hy,hz],
+        [hx,-hy,-hz],[hx,-hy,hz],[hx,hy,-hz],[hx,hy,hz],
+    ])
+    R = rotation_matrix_3d(rx, ry, rz)
+    rotated = corners @ R.T
+    aabb = np.max(rotated, axis=0) - np.min(rotated, axis=0)
+    return tuple(aabb)
 
 # --- GLOBAL 3D MODEL YÜKLEME VE ÇARPIŞMA (COLLISION) MOTORU HIZIRLIĞI ---
 UCAK_MESH = None
@@ -138,12 +163,13 @@ def kutular_cakisiyor_mu(pos1,dim1,pos2,dim2):
         min1[2]<max2[2] and max1[2]>min2[2]
         )
 
-# Gerçek Model Boyutlarına Göre İç Hacim Kontrolü (Hızlı Raycast)
+# Gerçek Model Boyutlarına Göre İç Hacim Kontrolü (Duvar Mesafesi ile Tam Sığma)
 def govde_icinde_mi(pos, dim):
     """
-    Merkez noktasından 6 yöne ışın atarak parçanın uçağın iç hacminde olup olmadığını kontrol eder.
-    Uçağın içindeki bir noktadan atılan ışınlar her yönde duvara çarpmalıdır.
-    En az 5/6 ışının çarpması gerekir (eski eşik 3/6 idi, çok gevşekti).
+    Merkez noktasından 6 yöne ışın atarak:
+    1. Merkez noktasının uçağın içinde olduğunu doğrular (ışınlar duvara çarpar)
+    2. Her yöndeki en yakın duvar mesafesinin bileşenin yarı-boyutundan büyük
+       olmasını kontrol eder → bileşen TAM OLARAK iç hacme sığar.
     """
     if UCAK_MESH is None:
         return True
@@ -154,73 +180,97 @@ def govde_icinde_mi(pos, dim):
     if x - dx/2.0 < 0 or x + dx/2.0 > GOVDE_UZUNLUK:
         return False
     
-    # Merkez noktasından 6 yöne ışın at
     ray_origins = np.array([[x, y, z]] * 6)
     ray_directions = np.array([
-        [0, 0, 1],  # Yukarı
-        [0, 0, -1], # Aşağı
-        [0, 1, 0],  # Sağ
-        [0, -1, 0], # Sol
-        [1, 0, 0],  # Ön
-        [-1, 0, 0]  # Arka
+        [0, 0, 1],   # +Z → dz/2 boşluk gerekli
+        [0, 0, -1],  # -Z → dz/2 boşluk gerekli
+        [0, 1, 0],   # +Y → dy/2 boşluk gerekli
+        [0, -1, 0],  # -Y → dy/2 boşluk gerekli
+        [1, 0, 0],   # +X → dx/2 boşluk gerekli
+        [-1, 0, 0]   # -X → dx/2 boşluk gerekli
     ])
-    hits = UCAK_MESH.ray.intersects_any(
+    min_clearance = np.array([dz/2.0, dz/2.0, dy/2.0, dy/2.0, dx/2.0, dx/2.0])
+    
+    # intersects_location: hem isabet hem mesafe bilgisi verir (aynı 6 ışın)
+    locations, ray_indices, _ = UCAK_MESH.ray.intersects_location(
         ray_origins=ray_origins, ray_directions=ray_directions
     )
     
-    # En az 5/6 ışın duvara çarpmalı (eski eşik 3 idi → dışarıdaki noktalar geçiyordu)
-    if np.sum(hits) < 5:
+    if len(locations) == 0:
         return False
-    return True
+    
+    ok_count = 0
+    for i in range(6):
+        mask = ray_indices == i
+        if not np.any(mask):
+            continue
+        # Bu yöndeki en yakın duvar mesafesi
+        dists = np.linalg.norm(locations[mask] - ray_origins[i], axis=1)
+        if np.min(dists) >= min_clearance[i]:
+            ok_count += 1
+    
+    # En az 5/6 yönde yeterli boşluk olmalı
+    return ok_count >= 5
     
 #Genetik alg. sınıfları
 
 class TasarimBireyi:
     def __init__(self):
         self.yerlesim = {}
+        self.rotasyon = {}  # {id: (rx, ry, rz) radyan}
         
     def rastgele_yerlestir(self):
         for komp in KOMPONENTLER_DB:
-            # Eğer parça kilitliyse (örn: Motor), sabit pozisyonunu al ve geç
             if komp.get("kilitli", False):
                 self.yerlesim[komp["id"]] = komp["sabit_pos"]
+                self.rotasyon[komp["id"]] = (0, 0, 0)
                 continue
             
-            bolge=komp["sabit_bolge"]
-            dx, dy, dz = komp["boyut"]
+            bolge = komp["sabit_bolge"]
+            boyut_orijinal = komp["boyut"]
             
             x, y, z = 0, 0, 0
+            best_rot = (0, 0, 0)
             yerlesti = False
             
-            # Makul bir rastgele konum bul ve CAD modeli içinde olduğundan emin ol
-            for _ in range(1000):  # Daha sıkı kontrol → daha fazla deneme gerekli
-                # Uçağın Plotly şekli ile oluşturduğu gerçek sınırları (Masked Bounding Box) kullan
+            for _ in range(1000):
+                # Rastgele sürekli rotasyon açıları (radyan)
+                rot = (random.uniform(0, 2*np.pi), random.uniform(0, 2*np.pi), random.uniform(0, 2*np.pi))
+                dx, dy, dz = get_rotated_aabb(boyut_orijinal, rot)
+                
                 if bolge in UCAK_BOLGE_SINIRLARI:
                     b_sinir = UCAK_BOLGE_SINIRLARI[bolge]
                     
-                    # Merkez bileşeni hedefe daha sıkı tutunmalı
+                    x_lo = b_sinir["x_min"] + dx/2
+                    x_hi = b_sinir["x_max"] - dx/2
+                    y_lo = b_sinir["y_min"] + dy/2
+                    y_hi = b_sinir["y_max"] - dy/2
+                    z_lo = b_sinir["z_min"] + dz/2
+                    z_hi = b_sinir["z_max"] - dz/2
+                    
+                    if x_lo >= x_hi or y_lo >= y_hi or z_lo >= z_hi:
+                        continue
+                    
                     if bolge == "MERKEZ":
                         center_x = (TARGET_CG_X_MIN + TARGET_CG_X_MAX) / 2
                         x = random.uniform(center_x - 40, center_x + 40)
                     else:
-                        x = random.uniform(b_sinir["x_min"] + dx/2, b_sinir["x_max"] - dx/2)
-                        
-                    y = random.uniform(b_sinir["y_min"] + dy/2, b_sinir["y_max"] - dy/2)
-                    z = random.uniform(b_sinir["z_min"] + dz/2, b_sinir["z_max"] - dz/2)
+                        x = random.uniform(x_lo, x_hi)
                     
-                else: 
-                    # Varsayılan
+                    y = random.uniform(y_lo, y_hi)
+                    z = random.uniform(z_lo, z_hi)
+                else:
                     x = random.uniform(0, GOVDE_UZUNLUK)
                     y = random.uniform(-50, 50)
                     z = random.uniform(-30, 40)
                 
-                # Mesh iç-hacim kontrolü (contains veya geliştirilmiş raycast)
                 if govde_icinde_mi((x,y,z), (dx,dy,dz)):
+                    best_rot = rot
                     yerlesti = True
                     break
                     
             if not yerlesti:
-                # Bölgenin bounding box merkezini güvenli varsayılan olarak kullan
+                best_rot = (0, 0, 0)
                 if bolge in UCAK_BOLGE_SINIRLARI:
                     b = UCAK_BOLGE_SINIRLARI[bolge]
                     x = (b["x_min"] + b["x_max"]) / 2
@@ -229,7 +279,8 @@ class TasarimBireyi:
                 else:
                     x, y, z = GOVDE_UZUNLUK / 2, 0, 0
                 
-            self.yerlesim[komp["id"]]=(x,y,z)
+            self.yerlesim[komp["id"]] = (x, y, z)
+            self.rotasyon[komp["id"]] = best_rot
             
 def calculate_fitness_design(birey):
     puan = 0.0
@@ -242,8 +293,8 @@ def calculate_fitness_design(birey):
             k1_id=keys[i]
             k2_id=keys[j]
             
-            dim1=KOMPONENTLER_DICT[k1_id]["boyut"]
-            dim2=KOMPONENTLER_DICT[k2_id]["boyut"]
+            dim1=get_rotated_aabb(KOMPONENTLER_DICT[k1_id]["boyut"], birey.rotasyon.get(k1_id, (0,0,0)))
+            dim2=get_rotated_aabb(KOMPONENTLER_DICT[k2_id]["boyut"], birey.rotasyon.get(k2_id, (0,0,0)))
             
             pos1=birey.yerlesim[k1_id]
             pos2=birey.yerlesim[k2_id]
@@ -259,28 +310,15 @@ def calculate_fitness_design(birey):
     for k_id,pos in birey.yerlesim.items():
         if "Yakit_Tanki" in k_id:
             continue
-        dim=KOMPONENTLER_DICT[k_id]["boyut"]
+        dim=get_rotated_aabb(KOMPONENTLER_DICT[k_id]["boyut"], birey.rotasyon.get(k_id, (0,0,0)))
         if not govde_icinde_mi(pos, dim):
             tasma_sayisi+=1
             
     puan-=tasma_sayisi*15000    # Hard constraint: Ağır ceza
     
-    # 3D MODEL DUVAR TEMASI (Clipping) KONTROLÜ (Gerçekçi FCL Çarpışma)
-    if UCAK_COLLISION_MANAGER is not None:
-        duvar_temas_sayisi = 0
-        for k_id, pos in birey.yerlesim.items():
-            dim = KOMPONENTLER_DICT[k_id]["boyut"]
-            
-            # Kutuyu oluştur ve pozisyona taşı
-            transform = np.eye(4)
-            transform[:3, 3] = pos
-            box = trimesh.creation.box(extents=dim, transform=transform)
-            
-            # Uçak zırhı (mesh) ile kesişiyor mu?
-            if UCAK_COLLISION_MANAGER.in_collision_single(box):
-                duvar_temas_sayisi += 1
-                
-        puan -= duvar_temas_sayisi * 15000 # Hard constraint: Duvara değen parça reddedilir
+    # NOT: in_collision_single kontrolü kaldırıldı.
+    # govde_icinde_mi() zaten duvar mesafesini kontrol ediyor (intersects_location).
+    # in_collision_single mesh yüzeyine yakın ama içeride olan bileşenleri yanlış cezalandırıyordu.
     
     # Sabit Bölge (Region) İhlali Kontrolü (Hard Constraint)
     bolge_ihlali_sayisi = 0
@@ -381,14 +419,24 @@ def calculate_fitness_design(birey):
         if doluluk == 1.0:
             dolu_cg_coords = (cg_x, cg_y, cg_z)
 
-        target_x_center = (TARGET_CG_X_MIN + TARGET_CG_X_MAX) / 2
+        # X ekseni için belirlenen aralık içindeyse ceza yok
+        if cg_x < TARGET_CG_X_MIN:
+            err_x = TARGET_CG_X_MIN - cg_x
+        elif cg_x > TARGET_CG_X_MAX:
+            err_x = cg_x - TARGET_CG_X_MAX
+        else:
+            err_x = 0.0
 
-        # Hedef CG'ye olan mesafe hatası
-        dist_error = ((cg_x - target_x_center)**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
+        err_y = cg_y - TARGET_CG_Y
+        err_z = cg_z - TARGET_CG_Z
+
+        # Hedef CG'ye olan mesafe hatası (3 Eksenli)
+        # Yanal denge (Y ekseni - Roll stabilitesi) uçaklarda çok kritiktir, ağırlıklı ceza:
+        dist_error = (err_x**2 + (err_y * 3.0)**2 + (err_z * 1.5)**2)**0.5
         toplam_cg_hatasi += dist_error
 
     # Ortalama hatayı puandan düş (Soft ceza)
-    puan -= (toplam_cg_hatasi / len(DOLULUK_ORANLARI)) * 100
+    puan -= (toplam_cg_hatasi / len(DOLULUK_ORANLARI)) * 200  # CG ağırlığı artırıldı
 
     return puan, dolu_cg_coords
   
@@ -398,34 +446,53 @@ def calculate_fitness_design(birey):
 #genetik işlemler
 def crossover_design(parent1, parent2):
     child = TasarimBireyi()
-    # Her komponent için ebeveynlerden birini seç
+    # Her komponent için ebeveynlerden birini seç (pozisyon + rotasyon birlikte)
     for k_id in KOMPONENTLER_DB:
         key = k_id["id"]
         if random.random() < 0.5:
             child.yerlesim[key] = parent1.yerlesim[key]
+            child.rotasyon[key] = parent1.rotasyon.get(key, (0,0,0))
         else:
             child.yerlesim[key] = parent2.yerlesim[key]
+            child.rotasyon[key] = parent2.rotasyon.get(key, (0,0,0))
     return child
 
 def mutate_design(birey, rate=0.1):
-    for k_id in birey.yerlesim:
-        # Kilitli parçaları mutasyona uğratma
+    for k_id in list(birey.yerlesim.keys()):
         comp_info = KOMPONENTLER_DICT.get(k_id)
         if comp_info and comp_info.get("kilitli", False):
             continue
 
         if random.random() < rate:
-            x, y, z = birey.yerlesim[k_id]
-            # Küçük kaydırma
+            old_pos = birey.yerlesim[k_id]
+            old_rot = birey.rotasyon.get(k_id, (0,0,0))
+            
+            # Yeni pozisyon dene
+            x, y, z = old_pos
             x += random.uniform(-10, 10)
             y += random.uniform(-5, 5)
             z += random.uniform(-5, 5)
-            birey.yerlesim[k_id] = (x, y, z)
+            
+            # Yeni rotasyon dene (%30 ihtimalle)
+            rx, ry, rz = old_rot
+            if random.random() < 0.3:
+                rx += random.uniform(-0.3, 0.3)
+                ry += random.uniform(-0.3, 0.3)
+                rz += random.uniform(-0.3, 0.3)
+            
+            new_rot = (rx, ry, rz)
+            dim = get_rotated_aabb(comp_info["boyut"], new_rot)
+            
+            # HARD CONSTRAINT: Sadece uçağın içindeyse kabul et
+            if govde_icinde_mi((x, y, z), dim):
+                birey.yerlesim[k_id] = (x, y, z)
+                birey.rotasyon[k_id] = new_rot
+            # else: eski pozisyon/rotasyon korunur
     return birey
 
 #simülasyon
 POP_SIZE=100
-GENERATIONS=50
+GENERATIONS=100
 populasyon=[]
 
 for _ in range(POP_SIZE):
@@ -449,7 +516,7 @@ for gen in range(GENERATIONS):
     best_cg=puanli_pop[0][2]
     
     if gen%10==0:
-        print(f"Nesil {gen}: Puan {best_score:.0f} | CG X: {best_cg[0]:.1f} (Hedef: {TARGET_CG_X_MIN}-{TARGET_CG_X_MAX})")
+        print(f"Nesil {gen}: Puan {best_score:.0f} | CG 3D: X:{best_cg[0]:.1f} Y:{best_cg[1]:.1f} Z:{best_cg[2]:.1f}")
         
     yeni_pop=[x[1]for x in puanli_pop[:10]]
     
@@ -516,37 +583,37 @@ def ucak_govdesi_olustur():
             
     return traces
 
-def komponent_mesh_ciz(pos, dim, color, k_id):
+def komponent_mesh_ciz(pos, dim, color, k_id, rotation=(0,0,0)):
     """
-    Komponentlerin tipine göre daha gerçekçi 3D geometriler (Silindir, Kutu, vb.) oluşturur.
-    Önceden sadece keskin köşeli bir Box çiziliyordu.
+    Komponentlerin tipine göre daha gerçekçi 3D geometriler oluşturur.
+    Sürekli rotasyon açıları (rx, ry, rz) uygulanır.
     """
     x, y, z = pos
     dx, dy, dz = dim
     
-    # Parçaya özel geometri seçimi
     if k_id == "Motor":
-        # Motor genelde yuvarlak bir bloğa benzer (Silindir)
         radius = (dy + dz) / 4
         mesh = trimesh.creation.cylinder(radius=radius, height=dx)
-        # trimesh silindiri Z ekseni boyunca oluşturur. Motor yatay durmalı (X yönünde).
         rot = trimesh.transformations.rotation_matrix(np.pi/2, [0, 1, 0])
         mesh.apply_transform(rot)
-        
     elif k_id == "Payload_Kam":
-        # Kamera altına bakan bir küremsi dome (kapsül)
         mesh = trimesh.creation.capsule(height=dx/2, radius=min(dy, dz)/2)
-        
     else:
-        # Yakıt tankı, Batarya, Aviyonik ve Servolar için kutu (dikdörtgen prizma)
         mesh = trimesh.creation.box(extents=dim)
     
-    # Geometriyi konumuna taşı
+    # Bileşen rotasyonunu uygula
+    rx, ry, rz = rotation
+    if rx != 0 or ry != 0 or rz != 0:
+        rot_mat = rotation_matrix_3d(rx, ry, rz)
+        rot_transform = np.eye(4)
+        rot_transform[:3, :3] = rot_mat
+        mesh.apply_transform(rot_transform)
+    
+    # Konumuna taşı
     transform = np.eye(4)
     transform[:3, 3] = pos
     mesh.apply_transform(transform)
     
-    # Plotly'e gönder
     return go.Mesh3d(
         x=mesh.vertices[:, 0], y=mesh.vertices[:, 1], z=mesh.vertices[:, 2],
         i=mesh.faces[:, 0], j=mesh.faces[:, 1], k=mesh.faces[:, 2],
@@ -567,25 +634,28 @@ colors = ['red', 'blue', 'orange', 'purple', 'green', 'brown', 'cyan']
 idx = 0
 print("\n--- TASARIM ANALİZİ ---")
 
-# 1. CG Hedefe Yakınlık Kontrolü
+# 1. CG Hedefe Yakınlık Kontrolü (3 Eksen)
 cg_x, cg_y, cg_z = best_cg
-# X ekseninde hedef aralığa göre sapma hesabı
+# X ekseni için sapma
 if cg_x < TARGET_CG_X_MIN:
-    dx = TARGET_CG_X_MIN - cg_x
+    err_x = TARGET_CG_X_MIN - cg_x
 elif cg_x > TARGET_CG_X_MAX:
-    dx = cg_x - TARGET_CG_X_MAX
+    err_x = cg_x - TARGET_CG_X_MAX
 else:
-    dx = 0.0
+    err_x = 0.0
 
-# Toplam mesafe hatası (X aralığı, Y=0 ve Z=0 hedeflerine göre)
-dist_error = (dx**2 + (cg_y - TARGET_CG_Y)**2 + (cg_z - TARGET_CG_Z)**2)**0.5
+err_y = cg_y - TARGET_CG_Y
+err_z = cg_z - TARGET_CG_Z
+
+# Toplam Öklid mesafe hatası (X aralığı, Y=0 ve Z=30 hedeflerine göre)
+dist_error = (err_x**2 + err_y**2 + err_z**2)**0.5
 
 if dist_error < 2.0:
-    print(f"✅ CG hedefe çok yakın (Sapma: {dist_error:.2f} cm)")
+    print(f"✅ 3D CG hedefe çok yakın (Sapma: {dist_error:.2f} cm)")
 elif dist_error < 15.0:
-    print(f"⚠️ CG hedefe orta mesafede (Sapma: {dist_error:.2f} cm)")
+    print(f"⚠️ 3D CG hedefe orta mesafede (Sapma: {dist_error:.2f} cm)")
 else:
-    print(f"❌ CG hedeften uzak (Sapma: {dist_error:.2f} cm)")
+    print(f"❌ 3D CG hedeften uzak (Sapma: {dist_error:.2f} cm) [dx:{err_x:.1f}, dy:{err_y:.1f}, dz:{err_z:.1f}]")
 
 # 2. Yakıt Tankı Etkisi Kontrolü
 # Yakıt tankları ağırlık merkezinden (CG) ne kadar uzaksa, yakıt azaldıkça uçağın dengesi o kadar bozulur.
@@ -608,60 +678,64 @@ elif best_score > -6000:
     print(f"👍 Tasarım kabul edilebilir (Skor: {best_score:.0f})")
 else:
     print(f"🚫 Tasarım zayıf (Skor: {best_score:.0f})")
-print("\n--- DENGE ANALİZİ (CG DRIFT) ---")
+print("\n--- DENGE ANALİZİ (3 EKSENLİ CG DRIFT) ---")
 
-# Denge Analizi Hesaplamaları (Sadece X ekseni için)
+# Denge Analizi Hesaplamaları (Tüm Vektörel Eksenler için)
 bos_agirlik = 0
-bos_moment_x = 0
+bos_m = np.zeros(3)
 dolu_agirlik = 0
-dolu_moment_x = 0
+dolu_m = np.zeros(3)
 
 for k_id, pos in en_iyi_tasarim.yerlesim.items():
     db_item = KOMPONENTLER_DICT[k_id]
     mass = db_item["agirlik"]
+    p_vec = np.array(pos)
 
     # Bos depo için moment (Yakıt = 0)
     bos_agirlik += mass
-    bos_moment_x += mass * pos[0]
+    bos_m += mass * p_vec
 
     # Dolu depo için moment (Yakıt = MAX)
     if "Yakit_Tanki" in k_id:
-        dolu_agirlik += (mass + MAX_YAKIT_AGIRLIGI/2)
-        dolu_moment_x += (mass + MAX_YAKIT_AGIRLIGI/2) * pos[0]
+        total_tank_mass = mass + MAX_YAKIT_AGIRLIGI/2
+        dolu_agirlik += total_tank_mass
+        dolu_m += total_tank_mass * p_vec
     else:
         dolu_agirlik += mass
-        dolu_moment_x += mass * pos[0]
+        dolu_m += mass * p_vec
 
-cg_bos_x = bos_moment_x / bos_agirlik
-cg_dolu_x = dolu_moment_x / dolu_agirlik
-cg_kaymasi = abs(cg_dolu_x - cg_bos_x)
+cg_bos = bos_m / bos_agirlik
+cg_dolu = dolu_m / dolu_agirlik
+cg_kaymasi = np.linalg.norm(cg_dolu - cg_bos)
 
-print(f"Yakit Tanklari Konumu (X): {yakit_pos_x:.2f} cm")
-print(f"CG (Dolu Depo)        : {cg_dolu_x:.2f} cm")
-print(f"CG (Bos Depo)         : {cg_bos_x:.2f} cm")
-print(f"CG Kaymasi (Drift)    : {cg_kaymasi:.2f} cm")
+print(f"Yakit Tanklari X Konumları: Sol={en_iyi_tasarim.yerlesim.get('Yakit_Tanki_Sol', (0,0,0))[0]:.1f}, Sag={en_iyi_tasarim.yerlesim.get('Yakit_Tanki_Sag', (0,0,0))[0]:.1f}")
+print(f"CG (Dolu Depo): X={cg_dolu[0]:.1f} Y={cg_dolu[1]:.1f} Z={cg_dolu[2]:.1f}")
+print(f"CG (Bos Depo) : X={cg_bos[0]:.1f} Y={cg_bos[1]:.1f} Z={cg_bos[2]:.1f}")
+print(f"Top 3D CG Kaymasi (Drift): {cg_kaymasi:.2f} cm")
 
 # Uyarı Mekanizması
-if cg_kaymasi > 5.0:
-    print("❌ KRİTİK: Yakıt tüketimi CG'yi çok fazla kaydırıyor! Uçuş stabilitesi tehlikede.")
-elif cg_kaymasi > 2.0:
-    print("⚠️ DİKKAT: Yakıt tüketimi dengeyi etkiliyor. Trim ayarı gerekecek.")
+if cg_kaymasi > 10.0:
+    print("❌ KRİTİK: Yakıt tüketimi 3D CG'yi çok fazla kaydırıyor! Uçuş stabilitesi tehlikede.")
+elif cg_kaymasi > 4.0:
+    print("⚠️ DİKKAT: Yakıt tüketimi 3D dengeyi etkiliyor. Trim ayarı gerekecek.")
 else:
-    print("✅ MÜKEMMEL: Yakıt tankları ideal konumda. Yakıt tüketiminin dengeye etkisi minimum.")
+    print("✅ MÜKEMMEL: Yakıt tankları iterasyonla mükemmel oturmuş. CG Drift minimum.")
 print("-----------------------\n")
 print("\n--- YERLEŞİM DETAYLARI ---")
 motor_pos = en_iyi_tasarim.yerlesim["Motor"] # Motor referansı
 
 for k_id, pos in en_iyi_tasarim.yerlesim.items():
-    # Boyut bilgisini DB'den çek
-    boyut = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)["boyut"]
+    # Orijinal boyut + rotasyon ile çizim
+    boyut_orijinal = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)["boyut"]
+    rot = en_iyi_tasarim.rotasyon.get(k_id, (0,0,0))
+    boyut_aabb = get_rotated_aabb(boyut_orijinal, rot)
     
-    # Kutuyu (veya silindiri) çiz
-    fig.add_trace(komponent_mesh_ciz(pos, boyut, colors[idx % len(colors)], k_id))
+    # Gerçek rotasyonlu mesh çiz
+    fig.add_trace(komponent_mesh_ciz(pos, boyut_orijinal, colors[idx % len(colors)], k_id, rot))
     
     # Etiket ekle (Havada asılı yazı)
     fig.add_trace(go.Scatter3d(
-        x=[pos[0]], y=[pos[1]], z=[pos[2] + boyut[2]/1.5], # Kutunun biraz üstüne
+        x=[pos[0]], y=[pos[1]], z=[pos[2] + boyut_aabb[2]/1.5], # Kutunun biraz üstüne
         mode='text', text=[k_id], textposition="top center",
         textfont=dict(size=10, color="black"), showlegend=False
     ))
