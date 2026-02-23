@@ -1,0 +1,91 @@
+{
+  "id": "uav_male",
+  "name": "MALE İHA (Anka Benzeri)",
+  "description": "Orta irtifa uzun dayanım insansız hava aracı",
+  "units": "cm",
+  "geometry": {
+    "fuselage_length": 800,
+    "fuselage_width": 120,
+    "fuselage_height": 100,
+    "nose_length": 120,
+    "nose_shape": "rounded",
+    "mid_start": 120,
+    "mid_end": 550,
+    "tail_start": 550,
+    "tail_end": 800,
+    "cross_section": "oval",
+    "wing": {
+      "sweep_angle_deg": 5,
+      "span": 1700,
+      "chord_root": 200,
+      "chord_tip": 80,
+      "position_x": 280,
+      "position_z": 20,
+      "dihedral_deg": 3
+    },
+    "horizontal_stabilizer": {
+      "span": 400,
+      "chord_root": 100,
+      "chord_tip": 50,
+      "position_x": 720,
+      "sweep_angle_deg": 10
+    },
+    "vertical_stabilizer": {
+      "count": 1,
+      "height": 150,
+      "chord_root": 120,
+      "chord_tip": 60,
+      "position_x": 700,
+      "cant_angle_deg": 0
+    }
+  },
+  "zones": {
+    "NOSE": {
+      "x_start": 0,
+      "x_end": 120,
+      "description": "Sensor ve kamera bölgesi"
+    },
+    "FRONT_FUSELAGE": {
+      "x_start": 120,
+      "x_end": 300,
+      "description": "Aviyonik ve haberleşme sistemleri"
+    },
+    "CENTER_FUSELAGE": {
+      "x_start": 300,
+      "x_end": 550,
+      "description": "Yakıt tankı, faydalı yük bölgesi"
+    },
+    "REAR_FUSELAGE": {
+      "x_start": 550,
+      "x_end": 720,
+      "description": "Motor ve güç sistemleri"
+    },
+    "TAIL": {
+      "x_start": 720,
+      "x_end": 800,
+      "description": "Kuyruk servo aktüatörleri"
+    },
+    "WING_LEFT": {
+      "y_min": -850,
+      "y_max": -60,
+      "x_start": 280,
+      "x_end": 480,
+      "description": "Sol kanat iç hacmi"
+    },
+    "WING_RIGHT": {
+      "y_min": 60,
+      "y_max": 850,
+      "x_start": 280,
+      "x_end": 480,
+      "description": "Sağ kanat iç hacmi"
+    }
+  },
+  "cg_target": {
+    "mac_percent_min": 22,
+    "mac_percent_max": 33,
+    "mac_leading_edge_x": 280,
+    "mac_length": 160
+  },
+  "max_fuel_weight": 800,
+  "empty_weight": 1400
+}

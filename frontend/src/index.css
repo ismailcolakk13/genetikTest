@@ -1,0 +1,642 @@
+/* ===== Uçak Yerleşim Optimizasyon Aracı — Ana Stiller ===== */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+
+:root {
+  /* Renk Paleti */
+  --bg-primary: #0a0e1a;
+  --bg-secondary: #111827;
+  --bg-card: #1a2332;
+  --bg-card-hover: #1f2b3d;
+  --bg-accent: rgba(59, 130, 246, 0.1);
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-red: #ef4444;
+  --accent-purple: #8b5cf6;
+
+  --gradient-primary: linear-gradient(135deg, #3b82f6, #06b6d4);
+  --gradient-success: linear-gradient(135deg, #10b981, #06b6d4);
+  --gradient-danger: linear-gradient(135deg, #ef4444, #f59e0b);
+
+  --border-color: rgba(255, 255, 255, 0.06);
+  --border-active: rgba(59, 130, 246, 0.4);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.15);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  height: 100vh;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Layout ===== */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 24px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  min-height: 56px;
+  z-index: 100;
+}
+
+.app-header h1 {
+  font-size: 16px;
+  font-weight: 700;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.3px;
+}
+
+.app-header .subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 12px;
+  font-weight: 400;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== Sol Panel ===== */
+.left-panel {
+  width: 320px;
+  min-width: 320px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.panel-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panel-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+/* ===== Uçak Tipi Seçimi ===== */
+.aircraft-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aircraft-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.aircraft-option:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-active);
+}
+
+.aircraft-option.selected {
+  border-color: var(--accent-blue);
+  background: var(--bg-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+.aircraft-option-icon {
+  font-size: 24px;
+}
+
+.aircraft-option-info h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.aircraft-option-info p {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* ===== Komponent Listesi ===== */
+.component-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.component-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 12px;
+}
+
+.component-item:hover {
+  background: var(--bg-card-hover);
+  transform: translateX(2px);
+}
+
+.component-item.selected {
+  border-color: var(--accent-blue);
+  background: var(--bg-accent);
+}
+
+.component-item.locked {
+  opacity: 0.6;
+}
+
+.comp-name {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.comp-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.comp-badge.locked {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--accent-red);
+}
+.comp-badge.fuel {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--accent-amber);
+}
+.comp-badge.avionics {
+  background: rgba(139, 92, 246, 0.2);
+  color: var(--accent-purple);
+}
+.comp-badge.propulsion {
+  background: rgba(6, 182, 212, 0.2);
+  color: var(--accent-cyan);
+}
+.comp-badge.systems {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--accent-emerald);
+}
+
+.comp-weight {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* ===== 3D Görüntüleyici ===== */
+.viewer-container {
+  flex: 1;
+  position: relative;
+  background: var(--bg-primary);
+}
+
+.viewer-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.viewer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ===== Sağ Panel ===== */
+.right-panel {
+  width: 340px;
+  min-width: 340px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* ===== CG Gösterge ===== */
+.cg-indicator {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.cg-bar-container {
+  position: relative;
+  height: 32px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: 10px 0;
+  border: 1px solid var(--border-color);
+}
+
+.cg-target-zone {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(16, 185, 129, 0.15);
+  border-left: 2px solid var(--accent-emerald);
+  border-right: 2px solid var(--accent-emerald);
+}
+
+.cg-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  border: 2px solid white;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  z-index: 2;
+  transition: left 0.5s ease;
+}
+
+.cg-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.cg-stat {
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.cg-stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cg-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.cg-stat-value.good {
+  color: var(--accent-emerald);
+}
+.cg-stat-value.warning {
+  color: var(--accent-amber);
+}
+.cg-stat-value.danger {
+  color: var(--accent-red);
+}
+
+/* ===== Optimizasyon Kontrolleri ===== */
+.optimize-controls {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-item label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.config-item input {
+  padding: 6px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: "Inter", sans-serif;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.config-item input:focus {
+  border-color: var(--accent-blue);
+}
+
+/* ===== Butonlar ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.btn-primary {
+  background: var(--gradient-primary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-active);
+}
+
+/* ===== İlerleme Çubuğu ===== */
+.progress-container {
+  margin: 12px 0;
+}
+
+.progress-bar-bg {
+  height: 6px;
+  background: var(--bg-card);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--gradient-primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ===== Kısıt İhlalleri ===== */
+.violations-panel {
+  padding: 16px;
+}
+
+.violation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.violation-item.warning {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.violation-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.no-violations {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: var(--accent-emerald);
+}
+
+/* ===== Generation History Chart ===== */
+.history-chart {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mini-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 60px;
+  padding: 4px 0;
+}
+
+.chart-bar {
+  flex: 1;
+  background: var(--accent-blue);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.chart-bar:hover {
+  opacity: 1;
+}
+
+/* ===== Yükleme Durumu ===== */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 16px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ===== Status bar ===== */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 16px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+  font-size: 11px;
+  color: var(--text-muted);
+  min-height: 28px;
+}
+
+.status-left,
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-emerald);
+  margin-right: 4px;
+}
+
+.status-dot.warning {
+  background: var(--accent-amber);
+}
+.status-dot.error {
+  background: var(--accent-red);
+}

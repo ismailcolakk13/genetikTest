@@ -1,0 +1,85 @@
+{
+  "id": "uav_combat",
+  "name": "Savaş İHA (UCAV)",
+  "description": "Düşük gözlenebilirlikli insansız savaş hava aracı (flying wing)",
+  "units": "cm",
+  "geometry": {
+    "fuselage_length": 1100,
+    "fuselage_width": 200,
+    "fuselage_height": 120,
+    "nose_length": 200,
+    "nose_shape": "diamond",
+    "mid_start": 200,
+    "mid_end": 750,
+    "tail_start": 750,
+    "tail_end": 1100,
+    "cross_section": "blended",
+    "wing": {
+      "sweep_angle_deg": 45,
+      "span": 1200,
+      "chord_root": 400,
+      "chord_tip": 100,
+      "position_x": 300,
+      "position_z": 0,
+      "dihedral_deg": 0
+    },
+    "horizontal_stabilizer": null,
+    "vertical_stabilizer": {
+      "count": 2,
+      "height": 120,
+      "chord_root": 150,
+      "chord_tip": 70,
+      "position_x": 900,
+      "cant_angle_deg": 40
+    }
+  },
+  "zones": {
+    "NOSE": {
+      "x_start": 0,
+      "x_end": 200,
+      "description": "AESA radar ve EO/IR sensör bölgesi"
+    },
+    "FRONT_FUSELAGE": {
+      "x_start": 200,
+      "x_end": 450,
+      "description": "Aviyonik ve silah yuvası ön bölgesi"
+    },
+    "CENTER_FUSELAGE": {
+      "x_start": 450,
+      "x_end": 750,
+      "description": "İç silah yuvası, yakıt tankları"
+    },
+    "REAR_FUSELAGE": {
+      "x_start": 750,
+      "x_end": 1000,
+      "description": "Motor ve hava kanalı"
+    },
+    "TAIL": {
+      "x_start": 1000,
+      "x_end": 1100,
+      "description": "Egzoz ve kuyruk"
+    },
+    "WING_LEFT": {
+      "y_min": -600,
+      "y_max": -100,
+      "x_start": 300,
+      "x_end": 700,
+      "description": "Sol kanat iç hacmi"
+    },
+    "WING_RIGHT": {
+      "y_min": 100,
+      "y_max": 600,
+      "x_start": 300,
+      "x_end": 700,
+      "description": "Sağ kanat iç hacmi"
+    }
+  },
+  "cg_target": {
+    "mac_percent_min": 20,
+    "mac_percent_max": 30,
+    "mac_leading_edge_x": 350,
+    "mac_length": 300
+  },
+  "max_fuel_weight": 2500,
+  "empty_weight": 4000
+}

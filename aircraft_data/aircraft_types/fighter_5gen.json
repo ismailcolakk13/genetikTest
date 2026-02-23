@@ -1,0 +1,91 @@
+{
+  "id": "fighter_5gen",
+  "name": "5. Nesil Savaş Uçağı (Generic)",
+  "description": "F-22/KAAN benzeri çift motorlu, iç silah yuvalı 5. nesil savaş uçağı",
+  "units": "cm",
+  "geometry": {
+    "fuselage_length": 1900,
+    "fuselage_width": 250,
+    "fuselage_height": 180,
+    "nose_length": 380,
+    "nose_shape": "ogive",
+    "mid_start": 380,
+    "mid_end": 1425,
+    "tail_start": 1425,
+    "tail_end": 1900,
+    "cross_section": "blended",
+    "wing": {
+      "sweep_angle_deg": 42,
+      "span": 1350,
+      "chord_root": 500,
+      "chord_tip": 150,
+      "position_x": 600,
+      "position_z": 0,
+      "dihedral_deg": -3
+    },
+    "horizontal_stabilizer": {
+      "span": 650,
+      "chord_root": 200,
+      "chord_tip": 80,
+      "position_x": 1600,
+      "sweep_angle_deg": 50
+    },
+    "vertical_stabilizer": {
+      "count": 2,
+      "height": 250,
+      "chord_root": 250,
+      "chord_tip": 100,
+      "position_x": 1550,
+      "cant_angle_deg": 27
+    }
+  },
+  "zones": {
+    "NOSE": {
+      "x_start": 0,
+      "x_end": 380,
+      "description": "Radar ve ön aviyonik bölgesi"
+    },
+    "FRONT_FUSELAGE": {
+      "x_start": 380,
+      "x_end": 700,
+      "description": "Kokpit, kanopi, ön iniş takımı bölgesi"
+    },
+    "CENTER_FUSELAGE": {
+      "x_start": 700,
+      "x_end": 1200,
+      "description": "Ana gövde: silah yuvası, yakıt tankları, aviyonik"
+    },
+    "REAR_FUSELAGE": {
+      "x_start": 1200,
+      "x_end": 1600,
+      "description": "Motor bölgesi, APU, jeneratörler"
+    },
+    "TAIL": {
+      "x_start": 1600,
+      "x_end": 1900,
+      "description": "Egzoz nozulları, kuyruk servoları"
+    },
+    "WING_LEFT": {
+      "y_min": -675,
+      "y_max": -125,
+      "x_start": 600,
+      "x_end": 1100,
+      "description": "Sol kanat iç hacmi"
+    },
+    "WING_RIGHT": {
+      "y_min": 125,
+      "y_max": 675,
+      "x_start": 600,
+      "x_end": 1100,
+      "description": "Sağ kanat iç hacmi"
+    }
+  },
+  "cg_target": {
+    "mac_percent_min": 25,
+    "mac_percent_max": 35,
+    "mac_leading_edge_x": 650,
+    "mac_length": 380
+  },
+  "max_fuel_weight": 8000,
+  "empty_weight": 15000
+}
