@@ -2,7 +2,7 @@
 """
 Created on Wed Nov  5 14:06:09 2025
 
-@author: ismai
+@authors: İsmail Çolak, Mehmet Can Çalışkan, Yusuf Eren Aykurt
 """
 import copy
 import matplotlib.patches as patches
@@ -30,9 +30,8 @@ BOLGE_BURUN_SON = 40.0
 BOLGE_KUYRUK_BAS = GOVDE_UZUNLUK - 40.0 # 260.0'dan sonrası kuyruk ucu
 
 KOMPONENTLER_DB = [
-    # Motor artık KESİN SABİT (Locked). Burun ucunda sabit duruyor.
-    {"id": "Motor",       "agirlik": 40.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN", "sabit_pos": (30, 0, 0), "kilitli": True, "titresim_hassasiyeti": False}, # Motorun kendisi titreşim kaynağı, kendisi hassas değil
-    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "GOVDE", "kilitli": False, "titresim_hassasiyeti": False}, # Artık serbest değil, gövde içinde
+    {"id": "Motor",       "agirlik": 40.0, "boyut": (60, 40, 40), "sabit_bolge": "BURUN", "sabit_pos": (30, 0, 0), "kilitli": True, "titresim_hassasiyeti": False},
+    {"id": "Batarya_Ana", "agirlik": 15.0, "boyut": (20, 15, 10), "sabit_bolge": "GOVDE", "kilitli": False, "titresim_hassasiyeti": False},
     {"id": "Aviyonik_1",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
     {"id": "Aviyonik_2",  "agirlik": 5.0,  "boyut": (15, 15, 5),  "sabit_bolge": "GOVDE",  "kilitli": False, "titresim_hassasiyeti": True},
     {"id": "Payload_Kam", "agirlik": 10.0, "boyut": (20, 20, 20), "sabit_bolge": "ON_ALT", "kilitli": False, "titresim_hassasiyeti": True},
@@ -89,12 +88,8 @@ def govde_icinde_mi(pos, dim):
         return False
     
     # 2. Radyal (Kesit) kontrolü
-    # Gövde kesiti X'e göre değiştiği için, parçanın
-    # hem başı hem sonu hem de ortası gövde sınırları içinde kalmalı.
     
     # Parçanın kesit köşegeni (Merkezden en uzak nokta)
-    # Eğer bu mesafe izin verilen yarıçaptan küçükse parça sığar.
-    # Not: Kare/Dikdörtgen kesit varsayımıyla köşegen alıyoruz.
     part_radial_dist = ((abs(y) + dy/2)**2 + (abs(z) + dz/2)**2)**0.5
     
     # Kontrol edilecek noktalar: Ön, Orta, Arka
@@ -115,7 +110,7 @@ class TasarimBireyi:
         
     def rastgele_yerlestir(self):
         for komp in KOMPONENTLER_DB:
-            # Eğer parça kilitliyse (örn: Motor), sabit pozisyonunu al ve geç
+            # Eğer parça kilitliyse sabit pozisyonunu al ve geç
             if komp.get("kilitli", False):
                 self.yerlesim[komp["id"]] = komp["sabit_pos"]
                 continue
@@ -175,7 +170,7 @@ def calculate_fitness_design(birey):
             
     puan-=tasma_sayisi*5000
     
-    # YENİ EKLENEN: TİTREŞİM KONTROLÜ ---
+    # TİTREŞİM KONTROLÜ
     # Motoru bul (Titreşim kaynağı)
     pos_motor = birey.yerlesim["Motor"] 
     
@@ -191,11 +186,11 @@ def calculate_fitness_design(birey):
             # Limitten yakınsa ceza kes
             if mesafe < TITRESIM_LIMITI:
                 ihlâl = TITRESIM_LIMITI - mesafe
-                puan -= (ihlâl ** 2) * 50 # Karesel ceza uyguluyoruz ki hızla uzaklaşsın
+                puan -= (ihlâl ** 2) * 50
 
     # 4. CG (Ağırlık Merkezi) Hesabı
     toplam_cg_hatasi = 0
-    # Sadece raporlama için kullanılacak değişken
+
     dolu_cg_coords = (0,0,0)
     # Her bir doluluk senaryosu için ayrı CG hesapla
     for doluluk in DOLULUK_ORANLARI:
@@ -208,7 +203,6 @@ def calculate_fitness_design(birey):
             db_item = next(item for item in KOMPONENTLER_DB if item["id"] == k_id)
             mass = db_item["agirlik"]
 
-            # Yakıt tankı ise doluluk oranına göre ağırlık ekle
             if k_id == "Yakit_Tanki":
                 mass += MAX_YAKIT_AGIRLIGI * doluluk
 
@@ -237,13 +231,9 @@ def calculate_fitness_design(birey):
 
     return puan, dolu_cg_coords
   
-   
-
-
 #genetik işlemler
 def crossover_design(parent1, parent2):
     child = TasarimBireyi()
-    # Her komponent için ebeveynlerden birini seç
     for k_id in KOMPONENTLER_DB:
         key = k_id["id"]
         if random.random() < 0.5:
@@ -471,7 +461,7 @@ else:
 
 # 3. Genel Skor Yorumu
 # Ceza sistemi olduğu için skor 0'a ne kadar yakınsa (negatif değerler) o kadar iyidir.
-if best_score > -2000:
+if best_score > -4000:
     print(f"🏆 Tasarım çok iyi (Skor: {best_score:.0f})")
 elif best_score > -6000:
     print(f"👍 Tasarım kabul edilebilir (Skor: {best_score:.0f})")
