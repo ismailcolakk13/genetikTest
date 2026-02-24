@@ -36,13 +36,14 @@ class FitnessResult:
     violation_count: int = 0
 
 
-# Fitness ağırlıkları
+# Fitness ağırlıkları (v2 — dengelenmiş)
 WEIGHTS = {
-    "cg": 1000.0,
-    "constraints": 1.0,  # Direkt ceza, ağırlık zaten constraint içinde
-    "drift": 500.0,
-    "symmetry_y": 200.0,
-    "inertia": 50.0,
+    "cg": 2000.0,           # CG sapması en yüksek öncelik
+    "constraints": 0.5,     # Constraint cezaları zaten yüksek (5000/ihlal)
+    "drift": 300.0,         # Yakıt drift ikincil
+    "symmetry_y": 400.0,    # Lateral simetri önemli
+    "inertia": 30.0,        # En düşük öncelik
+    "feasibility_bonus": 5000.0,  # Sıfır ihlal bonusu
 }
 
 
@@ -107,12 +108,18 @@ def calculate_fitness(
     # İnertia simetri oranına göre ödüllendirme
     result.inertia_score = -(1.0 - inertia.symmetry_ratio) * w.get("inertia", WEIGHTS["inertia"]) * 100
 
+    # Feasibility bonus: sıfır ihlal ödülü
+    feasibility_bonus = 0.0
+    if result.violation_count == 0:
+        feasibility_bonus = w.get("feasibility_bonus", 5000.0)
+
     # Toplam skor
     result.total_score = (
         result.cg_score +
         result.constraint_score +
         result.drift_score +
-        result.inertia_score
+        result.inertia_score +
+        feasibility_bonus
     )
 
     return result

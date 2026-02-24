@@ -83,8 +83,8 @@
   "cg_target": {
     "mac_percent_min": 25,
     "mac_percent_max": 35,
-    "mac_leading_edge_x": 650,
-    "mac_length": 380
+    "mac_leading_edge_x": 850,
+    "mac_length": 450
   },
   "max_fuel_weight": 8000,
   "empty_weight": 15000

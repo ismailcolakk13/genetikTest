@@ -170,7 +170,7 @@ def start_optimization(request: OptimizeRequest):
     config = GAConfig(
         population_size=request.population_size,
         generations=request.generations,
-        mutation_rate=request.mutation_rate,
+        mutation_rate_start=request.mutation_rate,
         vibration_limit=request.vibration_limit,
     )
 

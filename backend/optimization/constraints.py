@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Kısıt (constraint) motoru.
+Kısıt (constraint) motoru — v2 kalibre edilmiş.
 Komponent yerleşimi için çeşitli fiziksel ve tasarım kısıtlarını değerlendirir.
 """
 
@@ -32,13 +32,30 @@ class ConstraintResult:
         self.violation_count += 1
 
 
-# Ceza ağırlıkları
-PENALTY_COLLISION = 10000
-PENALTY_BOUNDARY = 5000
-PENALTY_ZONE = 3000
-PENALTY_VIBRATION = 2000
-PENALTY_PROXIMITY = 1000
-PENALTY_SYMMETRY = 500
+# Ceza ağırlıkları (v2 — kalibre edilmiş)
+PENALTY_COLLISION = 5000    # Düşürüldü: CG sinyalini bastırmaması için
+PENALTY_BOUNDARY = 3000     # Orantılı ceza ile
+PENALTY_ZONE = 2000         # Düşürüldü
+PENALTY_VIBRATION = 1500    # Hafif düşürüldü
+PENALTY_PROXIMITY = 800     # İkincil kısıt
+PENALTY_SYMMETRY = 300      # Tercih, zorunlu değil
+
+
+def _box_penetration_depth(pos1, size1, pos2, size2):
+    """İki AABB kutusunun penetrasyon derinliğini hesapla."""
+    overlap = 0.0
+    for axis in range(3):
+        half1 = size1[axis] / 2
+        half2 = size2[axis] / 2
+        min1 = pos1[axis] - half1
+        max1 = pos1[axis] + half1
+        min2 = pos2[axis] - half2
+        max2 = pos2[axis] + half2
+
+        axis_overlap = min(max1, max2) - max(min1, min2)
+        if axis_overlap > 0:
+            overlap += axis_overlap
+    return overlap
 
 
 def evaluate_all_constraints(
@@ -60,10 +77,9 @@ def evaluate_all_constraints(
         ConstraintResult nesnesi
     """
     result = ConstraintResult()
-
     comp_dict = {c.id: c for c in components}
 
-    # 1. Çakışma kontrolü
+    # 1. Çakışma kontrolü — orantılı penetrasyon cezası
     keys = [k for k in layout.keys()]
     for i in range(len(keys)):
         for j in range(i + 1, len(keys)):
@@ -73,12 +89,18 @@ def evaluate_all_constraints(
 
             c1, c2 = comp_dict[id1], comp_dict[id2]
             if boxes_collide(layout[id1], c1.size, layout[id2], c2.size):
+                # Penetrasyon derinliğine orantılı ceza
+                depth = _box_penetration_depth(layout[id1], c1.size, layout[id2], c2.size)
+                avg_size = (sum(c1.size) + sum(c2.size)) / 6
+                severity = min(depth / (avg_size + 1), 3.0)
+                penalty = PENALTY_COLLISION * (0.3 + 0.7 * severity)
+
                 result.add(ConstraintViolation(
                     constraint_type="COLLISION",
                     component_id=id1,
                     related_component=id2,
                     description=f"{c1.name} ile {c2.name} çakışıyor",
-                    penalty=PENALTY_COLLISION,
+                    penalty=penalty,
                 ))
 
     # 2. Gövde sınırı kontrolü
@@ -114,7 +136,6 @@ def evaluate_all_constraints(
             ))
 
     # 4. Titreşim hassasiyeti kontrolü
-    # Titreşim kaynağı olan parçaları bul
     vib_sources = [
         comp_id for comp_id, comp in comp_dict.items()
         if comp.vibration_source and comp_id in layout
@@ -143,7 +164,6 @@ def evaluate_all_constraints(
             target_id = comp.proximity_to
             if target_id in layout:
                 dist = distance_3d(layout[comp_id], layout[target_id])
-                # Yakınlık limiti: 150 cm
                 proximity_limit = 150.0
                 if dist > proximity_limit:
                     result.add(ConstraintViolation(
@@ -166,7 +186,6 @@ def _check_symmetry(
     result: ConstraintResult
 ):
     """Sol-sağ komponent çiftlerinin simetrisini kontrol et."""
-    # _L ve _R son ekleriyle eşleşen çiftleri bul
     checked = set()
     for comp_id in layout:
         if comp_id.endswith("_L") and comp_id not in checked:
@@ -178,13 +197,12 @@ def _check_symmetry(
                 pos_l = layout[comp_id]
                 pos_r = layout[pair_id]
 
-                # Y ekseni simetri kontrolü (sol: negatif, sağ: pozitif)
                 y_diff = abs(abs(pos_l[1]) - abs(pos_r[1]))
                 x_diff = abs(pos_l[0] - pos_r[0])
                 z_diff = abs(pos_l[2] - pos_r[2])
 
                 total_asym = x_diff + y_diff + z_diff
-                if total_asym > 20.0:  # 20 cm tolerans
+                if total_asym > 20.0:
                     result.add(ConstraintViolation(
                         constraint_type="SYMMETRY",
                         component_id=comp_id,
