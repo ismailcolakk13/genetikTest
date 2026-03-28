@@ -51,7 +51,25 @@ aircraft = Aircraft(
 # --- SİMÜLASYON ---
 POP_SIZE = 100
 GENERATIONS = 50
-ALGORITMA = "NSGA2" # "GA", "PSO" veya "NSGA2"
+print("\n--- SİMÜLASYON BAŞLATILIYOR ---")
+print("Lütfen çalıştırmak istediğiniz algoritmayı seçin:")
+print("1 - Genetik Algoritma (GA)")
+print("2 - Parçacık Sürüsü Optimizasyonu (PSO)")
+print("3 - NSGA-II (Çok Amaçlı Optimizasyon)")
+
+while True:
+    secim = input("Seçiminiz (1/2/3): ").strip()
+    if secim == '1':
+        ALGORITMA = "GA"
+        break
+    elif secim == '2':
+        ALGORITMA = "PSO"
+        break
+    elif secim == '3':
+        ALGORITMA = "NSGA2"
+        break
+    else:
+        print("Geçersiz seçim! Lütfen 1, 2 veya 3 girin.")
 
 if ALGORITMA == "PSO":
     en_iyi_tasarim, best_score, best_cg = run_pso(POP_SIZE, GENERATIONS, aircraft)
