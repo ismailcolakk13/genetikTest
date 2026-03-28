@@ -9,6 +9,7 @@ from yardimcilar.gorsellestirici import gorsellestir_tasarim
 from yardimcilar.yerlesimAnaliz import analiz_yap
 from algoritmalar.ga import run_ga
 from algoritmalar.pso import run_pso
+from algoritmalar.nsga2 import run_nsga2
 from modeller.aircraft import Aircraft
 from modeller.komponent import Komponent
 
@@ -50,10 +51,12 @@ aircraft = Aircraft(
 # --- SİMÜLASYON ---
 POP_SIZE = 100
 GENERATIONS = 50
-ALGORITMA = "PSO" # "GA" veya "PSO"
+ALGORITMA = "NSGA2" # "GA", "PSO" veya "NSGA2"
 
 if ALGORITMA == "PSO":
     en_iyi_tasarim, best_score, best_cg = run_pso(POP_SIZE, GENERATIONS, aircraft)
+elif ALGORITMA == "NSGA2":
+    en_iyi_tasarim, best_score, best_cg = run_nsga2(POP_SIZE, GENERATIONS, aircraft)
 else:
     en_iyi_tasarim, best_score, best_cg = run_ga(POP_SIZE, GENERATIONS, aircraft)
 
