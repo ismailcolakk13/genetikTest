@@ -40,6 +40,25 @@ def analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
         print(f"👍 Tasarım kabul edilebilir (Skor: {best_score:.0f})")
     else:
         print(f"🚫 Tasarım zayıf (Skor: {best_score:.0f})")
+
+    # 4. SICAKLIK PROFİLİ ANALİZİ
+    print("\n--- SICAKLIK PROFİLİ ANALİZİ ---")
+    pos_motor = en_iyi_tasarim.yerlesim.get("Motor")
+    if pos_motor:
+        sicaklik_ihlali_var = False
+        for k_id, pos in en_iyi_tasarim.yerlesim.items():
+            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            if parca_db.sicaklik_hassasiyeti:
+                mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
+                if mesafe < aircraft.sicaklik_limiti:
+                    print(f"🔥 {k_id}: Motora çok yakın ({mesafe:.1f} cm) - SICAKLIK RİSKİ! (Limit: {aircraft.sicaklik_limiti} cm)")
+                    sicaklik_ihlali_var = True
+                elif mesafe < aircraft.sicaklik_limiti * 1.5:
+                    print(f"⚠️ {k_id}: Motora mesafe sınırda ({mesafe:.1f} cm) - DİKKAT")
+                else:
+                    print(f"✅ {k_id}: Motordan güvenli mesafede ({mesafe:.1f} cm)")
+        if not sicaklik_ihlali_var:
+            print("✅ Tüm ısıya hassas parçalar güvenli mesafede.")
         
     print("\n--- DENGE ANALİZİ (CG DRIFT) ---")
 

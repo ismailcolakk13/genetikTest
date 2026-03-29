@@ -1,5 +1,28 @@
 import random
 
+# Bölge sınırlarını döndüren yardımcı fonksiyon
+def bolge_x_sinirlari(komp, aircraft):
+    """Komponentin sabit_bolge'sine göre izin verilen X aralığını döndürür."""
+    bolge = komp.sabit_bolge
+    if bolge == "BURUN":
+        return (0, aircraft.bolge_burun_son)
+    elif bolge == "KUYRUK":
+        return (aircraft.bolge_kuyruk_bas, aircraft.govde_uzunluk)
+    elif bolge == "MERKEZ":
+        center_x = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
+        return (center_x - 30, center_x + 30)
+    elif bolge == "AVIYONIK_BAY":
+        return (aircraft.bolge_aviyonik_bas, aircraft.bolge_aviyonik_son)
+    elif bolge == "GOVDE":
+        return (aircraft.bolge_burun_son, aircraft.bolge_kuyruk_bas)
+    else:
+        return (0, aircraft.govde_uzunluk)
+
+def clamp_x_bolge(komp, x, aircraft):
+    """X koordinatını komponentin bölge sınırları içine çeker."""
+    x_min, x_max = bolge_x_sinirlari(komp, aircraft)
+    return max(x_min, min(x, x_max))
+
 # Çakışma kontrolü
 def kutular_cakisiyor_mu(pos1,dim1,pos2,dim2):
     min1=[pos1[0]-dim1[0]/2,pos1[1]-dim1[1]/2,pos1[2]-dim1[2]/2]
@@ -35,6 +58,8 @@ class TasarimBireyi:
             elif bolge=="MERKEZ":
                 center_x = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
                 x=random.uniform(center_x-30, center_x+30)
+            elif bolge=="AVIYONIK_BAY":
+                x=random.uniform(aircraft.bolge_aviyonik_bas, aircraft.bolge_aviyonik_son)
             elif bolge=="GOVDE":
                 # Burun ile Kuyruk arasındaki ana hacim
                 x=random.uniform(aircraft.bolge_burun_son, aircraft.bolge_kuyruk_bas)
@@ -99,6 +124,28 @@ def calculate_fitness_design(birey, aircraft):
                 if mesafe < aircraft.titresim_limiti:
                     ihlâl = aircraft.titresim_limiti - mesafe
                     puan -= (ihlâl ** 2) * 50
+
+    # SICAKLIK PROFİLİ KONTROLÜ
+    # Motor sıcaklık kaynağı - ısıya hassas parçalar belirli mesafeden uzak olmalı
+    if pos_motor:
+        for k_id, pos in birey.yerlesim.items():
+            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            if parca_db.sicaklik_hassasiyeti:
+                mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
+                if mesafe < aircraft.sicaklik_limiti:
+                    ihlal = aircraft.sicaklik_limiti - mesafe
+                    puan -= (ihlal ** 2) * 60  # Sıcaklık cezası (titreşimden biraz daha ağır)
+
+    # BÖLGE İHLALİ KONTROLÜ
+    for k_id, pos in birey.yerlesim.items():
+        parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+        if parca_db.kilitli:
+            continue
+        x_min, x_max = bolge_x_sinirlari(parca_db, aircraft)
+        if pos[0] < x_min:
+            puan -= (x_min - pos[0]) * 100
+        elif pos[0] > x_max:
+            puan -= (pos[0] - x_max) * 100
 
     # 4. CG (Ağırlık Merkezi) Hesabı
     toplam_cg_hatasi = 0
@@ -187,6 +234,27 @@ def calculate_fitness_nsga2(birey, aircraft):
                     ihlâl = aircraft.titresim_limiti - mesafe
                     ceza_puani += (ihlâl ** 2) * 50
 
+    # SICAKLIK PROFİLİ KONTROLÜ
+    if pos_motor:
+        for k_id, pos in birey.yerlesim.items():
+            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            if parca_db.sicaklik_hassasiyeti:
+                mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
+                if mesafe < aircraft.sicaklik_limiti:
+                    ihlal = aircraft.sicaklik_limiti - mesafe
+                    ceza_puani += (ihlal ** 2) * 60
+
+    # BÖLGE İHLALİ KONTROLÜ
+    for k_id, pos in birey.yerlesim.items():
+        parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+        if parca_db.kilitli:
+            continue
+        x_min, x_max = bolge_x_sinirlari(parca_db, aircraft)
+        if pos[0] < x_min:
+            ceza_puani += (x_min - pos[0]) * 100
+        elif pos[0] > x_max:
+            ceza_puani += (pos[0] - x_max) * 100
+
     # CG (Ağırlık Merkezi) Miktarı
     toplam_cg_hatasi = 0
     dolu_cg_coords = (0, 0, 0)
@@ -220,4 +288,3 @@ def calculate_fitness_nsga2(birey, aircraft):
     cg_hatasi = toplam_cg_hatasi / len(aircraft.doluluk_oranlari)
 
     return ceza_puani, cg_hatasi, dolu_cg_coords
-

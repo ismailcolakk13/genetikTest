@@ -1,7 +1,7 @@
 class Aircraft:
     def __init__(self, govde_uzunluk, govde_cap, 
                  target_cg_x_min, target_cg_x_max, target_cg_y, target_cg_z, 
-                 max_yakit_agirligi, titresim_limiti, komponentler_db):
+                 max_yakit_agirligi, titresim_limiti, sicaklik_limiti, komponentler_db):
         
         self.govde_uzunluk = govde_uzunluk
         self.govde_cap = govde_cap
@@ -14,13 +14,16 @@ class Aircraft:
         
         self.max_yakit_agirligi = max_yakit_agirligi
         self.titresim_limiti = titresim_limiti
+        self.sicaklik_limiti = sicaklik_limiti
         self.komponentler_db = komponentler_db
         
         self.doluluk_oranlari = [0.0, 0.25, 0.5, 0.75, 1.0]
         
         # BÖLGE TANIMLARI (Sınırlar)
         self.bolge_burun_son = 40.0
-        self.bolge_kuyruk_bas = self.govde_uzunluk - 40.0 
+        self.bolge_kuyruk_bas = self.govde_uzunluk - 40.0
+        self.bolge_aviyonik_bas = 80.0
+        self.bolge_aviyonik_son = 180.0
         
     def get_fuselage_radius(self, x):
         """

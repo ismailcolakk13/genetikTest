@@ -24,15 +24,16 @@ TARGET_CG_Z = 0.0
 
 MAX_YAKIT_AGIRLIGI = 50.0
 TITRESIM_LIMITI = 50.0
+SICAKLIK_LIMITI = 30.0  # cm - Motor'a bu mesafeden yakın olan ısıya hassas parçalara ceza
 
 KOMPONENTLER_DB = [ # Bunlar kullanıcıdan alınmalı, geçici olarak burada tanımlı.
-    Komponent(id="Motor", agirlik=40.0, boyut=(60, 40, 40), sabit_bolge="BURUN", sabit_pos=(30, 0, 0), kilitli=True, titresim_hassasiyeti=False),
-    Komponent(id="Batarya_Ana", agirlik=15.0, boyut=(20, 15, 10), sabit_bolge="GOVDE", kilitli=False, titresim_hassasiyeti=False),
-    Komponent(id="Aviyonik_1", agirlik=5.0, boyut=(15, 15, 5), sabit_bolge="GOVDE", kilitli=False, titresim_hassasiyeti=True),
-    Komponent(id="Aviyonik_2", agirlik=5.0, boyut=(15, 15, 5), sabit_bolge="GOVDE", kilitli=False, titresim_hassasiyeti=True),
-    Komponent(id="Payload_Kam", agirlik=10.0, boyut=(20, 20, 20), sabit_bolge="ON_ALT", kilitli=False, titresim_hassasiyeti=True),
-    Komponent(id="Yakit_Tanki", agirlik=40.0, boyut=(50, 40, 30), sabit_bolge="MERKEZ", kilitli=False, titresim_hassasiyeti=False),
-    Komponent(id="Servo_Kuyruk", agirlik=2.0, boyut=(5, 5, 5), sabit_bolge="KUYRUK", kilitli=False, titresim_hassasiyeti=False),
+    Komponent(id="Motor", agirlik=40.0, boyut=(60, 40, 40), sabit_bolge="BURUN", sabit_pos=(30, 0, 0), kilitli=True, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+    Komponent(id="Batarya_Ana", agirlik=15.0, boyut=(20, 15, 10), sabit_bolge="GOVDE", kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=True),
+    Komponent(id="Aviyonik_1", agirlik=5.0, boyut=(15, 15, 5), sabit_bolge="AVIYONIK_BAY", kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=True),
+    Komponent(id="Aviyonik_2", agirlik=5.0, boyut=(15, 15, 5), sabit_bolge="AVIYONIK_BAY", kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=True),
+    Komponent(id="Payload_Kam", agirlik=10.0, boyut=(20, 20, 20), sabit_bolge="ON_ALT", kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=False),
+    Komponent(id="Yakit_Tanki", agirlik=40.0, boyut=(50, 40, 30), sabit_bolge="MERKEZ", kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+    Komponent(id="Servo_Kuyruk", agirlik=2.0, boyut=(5, 5, 5), sabit_bolge="KUYRUK", kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
 ]
 
 # Aircraft modelini oluştur
@@ -45,6 +46,7 @@ aircraft = Aircraft(
     target_cg_z=TARGET_CG_Z,
     max_yakit_agirligi=MAX_YAKIT_AGIRLIGI,
     titresim_limiti=TITRESIM_LIMITI,
+    sicaklik_limiti=SICAKLIK_LIMITI,
     komponentler_db=KOMPONENTLER_DB
 )
 
@@ -82,4 +84,4 @@ else:
 analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA) 
 
 # Uçağın 3D modelini gösteren fonksiyon
-gorsellestir_tasarim(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA) 
+gorsellestir_tasarim(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA)

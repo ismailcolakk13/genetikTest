@@ -1,5 +1,5 @@
 import random
-from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_design
+from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_design, clamp_x_bolge
 
 def crossover_design(parent1, parent2, aircraft):
     child = TasarimBireyi()
@@ -18,13 +18,17 @@ def mutate_design(birey, aircraft, rate=0.1):
         if comp_info and comp_info.kilitli:
             continue
 
+        x, y, z = birey.yerlesim[k_id]
+
         if random.random() < rate:
-            x, y, z = birey.yerlesim[k_id]
             # Küçük kaydırma
             x += random.uniform(-10, 10)
             y += random.uniform(-5, 5)
             z += random.uniform(-5, 5)
-            birey.yerlesim[k_id] = (x, y, z)
+
+        # Bölge sınırına clamp (her zaman uygula)
+        x = clamp_x_bolge(comp_info, x, aircraft)
+        birey.yerlesim[k_id] = (x, y, z)
     return birey
 
 def run_ga(pop_size, generations, aircraft):
@@ -54,6 +58,15 @@ def run_ga(pop_size, generations, aircraft):
             print(f"Nesil {gen}: Puan {best_score:.0f} | CG X: {best_cg[0]:.1f} (Hedef: {aircraft.target_cg_x_min}-{aircraft.target_cg_x_max})")
             
         yeni_pop=[x[1]for x in puanli_pop[:10]]
+        
+        # Elitlere de bölge clamp uygula
+        for ind in yeni_pop:
+            for k_id in ind.yerlesim:
+                comp_info = next((item for item in aircraft.komponentler_db if item.id == k_id), None)
+                if comp_info and not comp_info.kilitli:
+                    x, y, z = ind.yerlesim[k_id]
+                    x = clamp_x_bolge(comp_info, x, aircraft)
+                    ind.yerlesim[k_id] = (x, y, z)
         
         while len(yeni_pop)<pop_size:
             parent1=random.choice(puanli_pop[:30])[1]
