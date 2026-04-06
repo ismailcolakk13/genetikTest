@@ -1,6 +1,6 @@
 import copy
 import random
-from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_design, clamp_xz_bolge
+from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_design, clamp_xz_bolge, clamp_yz_fuselage
 
 class PsoParticle(TasarimBireyi):
     def __init__(self):
@@ -74,6 +74,8 @@ def run_pso(pop_size, generations, aircraft):
 
                 # X ve Z bölge sınırına clamp
                 new_x, new_z = clamp_xz_bolge(comp_info, new_x, new_z, aircraft)
+                # YZ fuselage dairesel sınırına clamp
+                new_y, new_z = clamp_yz_fuselage(comp_info, new_x, new_y, new_z, aircraft)
 
                 p.yerlesim[k_id] = (new_x, new_y, new_z)
             

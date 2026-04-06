@@ -1,4 +1,5 @@
 import random
+import math
 
 # ---------------------------------------------------------------------------
 # BÖLGE YARDIMCI FONKSİYONLARI
@@ -65,6 +66,23 @@ def clamp_xz_bolge(komp, x, z, aircraft):
     return max(x_min, min(x, x_max)), max(z_min, min(z, z_max))
 
 
+def clamp_yz_fuselage(komp, x, y, z, aircraft):
+    """
+    Y ve Z koordinatlarını o X istasyonundaki fuselage dairesi içine çeker.
+    Komponen boyutunun en geniş tarafı kadar güvenlik marjı bırakır.
+    """
+    r_fus = aircraft.get_fuselage_radius(x)
+    _, dy, dz = komp.boyut
+    margin = max(dy / 2, dz / 2)
+    r_max = max(0.0, r_fus - margin)
+    radial = math.sqrt(y ** 2 + z ** 2)
+    if radial > r_max and radial > 0:
+        scale = r_max / radial
+        y *= scale
+        z *= scale
+    return y, z
+
+
 # ---------------------------------------------------------------------------
 # ÇAKIŞMA KONTROLÜ
 # ---------------------------------------------------------------------------
@@ -93,6 +111,8 @@ class TasarimBireyi:
         """
         Her komponenti izin_verilen_bolgeler listesinden rastgele
         seçilen bir bölgeye, o bölgenin X/Z sınırları içinde yerleştirir.
+        YZ düzleminde kutupsal koordinat kullanılarak fuselage içinde
+        gerçekçi 3D dağılım sağlanır.
         """
         for komp in aircraft.komponentler_db:
             # Kilitli parçalar sabit pozisyonlarında
@@ -102,9 +122,37 @@ class TasarimBireyi:
 
             x_min, x_max, z_min, z_max = _rastgele_bolge_sec(komp, aircraft)
 
+            # X pozisyonu
             x = random.uniform(x_min, x_max)
-            y = random.uniform(-aircraft.govde_yaricap / 2, aircraft.govde_yaricap / 2)
-            z = random.uniform(z_min, z_max)
+
+            # O X kesitindeki fuselage yarıçapı
+            r_fus = aircraft.get_fuselage_radius(x)
+
+            # Komponentin taşmaması için maksimum kullanılabilir iç yarıçap
+            dx_k, dy, dz = komp.boyut
+            # Kesit dışına taşmamak için y ve z yarı genişliklerinin en büyüğü
+            margin = max(dy / 2, dz / 2)
+            r_max = max(0.0, r_fus - margin)
+
+            # Z bölge kısıtlarına göre açı aralığını belirle
+            # TAVAN: z>0 → theta ∈ [0, π], TABAN: z<0 → theta ∈ [π, 2π], diğer: tam daire
+            if z_min >= 0:
+                # TAVAN bölgesi — yalnızca üst yarı daire
+                theta = random.uniform(0, math.pi)
+            elif z_max <= 0:
+                # TABAN bölgesi — yalnızca alt yarı daire
+                theta = random.uniform(math.pi, 2 * math.pi)
+            else:
+                # Tam daire serbestlik
+                theta = random.uniform(0, 2 * math.pi)
+
+            # Kutupsal → kartezyen  (dairesel disk üzerinde uniform dağılım)
+            r_place = math.sqrt(random.uniform(0, 1)) * r_max
+            y = r_place * math.cos(theta)
+            z = r_place * math.sin(theta)
+
+            # Z bölge sınırına sıkıştır
+            z = max(z_min, min(z, z_max))
 
             self.yerlesim[komp.id] = (x, y, z)
 

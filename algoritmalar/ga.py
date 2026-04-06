@@ -1,5 +1,5 @@
 import random
-from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_design, clamp_xz_bolge
+from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_design, clamp_xz_bolge, clamp_yz_fuselage
 
 def crossover_design(parent1, parent2, aircraft):
     child = TasarimBireyi()
@@ -21,11 +21,13 @@ def mutate_design(birey, aircraft, rate=0.1):
 
         if random.random() < rate:
             x += random.uniform(-10, 10)
-            y += random.uniform(-5, 5)
-            z += random.uniform(-5, 5)
+            y += random.uniform(-10, 10)
+            z += random.uniform(-10, 10)
 
         # X ve Z bölge sınırına clamp
         x, z = clamp_xz_bolge(comp_info, x, z, aircraft)
+        # YZ fuselage dairesel sınırına clamp
+        y, z = clamp_yz_fuselage(comp_info, x, y, z, aircraft)
         birey.yerlesim[k_id] = (x, y, z)
     return birey
 
@@ -65,6 +67,7 @@ def run_ga(pop_size, generations, aircraft):
                 if comp_info and not comp_info.kilitli:
                     x, y, z = ind.yerlesim[k_id]
                     x, z = clamp_xz_bolge(comp_info, x, z, aircraft)
+                    y, z = clamp_yz_fuselage(comp_info, x, y, z, aircraft)
                     ind.yerlesim[k_id] = (x, y, z)
 
         while len(yeni_pop) < pop_size:
