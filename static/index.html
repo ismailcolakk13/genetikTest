@@ -49,6 +49,14 @@
                     <label>Max Fuel (kg)</label>
                     <input type="number" id="max_yakit_agirligi" value="50.0" step="1">
                 </div>
+                <div class="input-group">
+                    <label>Temp Limit (cm)</label>
+                    <input type="number" id="sicaklik_limiti" value="30.0" step="1">
+                </div>
+                <div class="input-group">
+                    <label>Vibration Limit (cm)</label>
+                    <input type="number" id="titresim_limiti" value="50.0" step="1">
+                </div>
             </div>
 
             <div class="form-section">
@@ -97,7 +105,7 @@
                                 <th>Weight (kg)</th>
                                 <th>Size W/H/D (cm)</th>
                                 <th>Constraint Region</th>
-                                <th>Locked/Vibration</th>
+                                <th>Locked/Vib/Temp</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -158,14 +166,15 @@
                 <select class="c-region">
                     <option value="BURUN">Burun (Nose)</option>
                     <option value="GOVDE">Govde (Body)</option>
-                    <option value="MERKEZ">Merkez (Center)</option>
                     <option value="KUYRUK">Kuyruk (Tail)</option>
-                    <option value="ON_ALT">On Alt (Lower Front)</option>
+                    <option value="TAVAN">Tavan (Ceiling)</option>
+                    <option value="TABAN">Taban (Floor)</option>
                 </select>
             </td>
             <td>
                 <label class="check-container">L<input type="checkbox" class="c-locked"></label>
                 <label class="check-container">V<input type="checkbox" class="c-vib"></label>
+                <label class="check-container">T<input type="checkbox" class="c-temp"></label>
             </td>
             <td>
                 <button class="icon-btn del-btn"><ion-icon name="trash-outline"></ion-icon></button>

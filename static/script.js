@@ -1,11 +1,11 @@
 const initialComponents = [
-    { id: "Motor", w: 40.0, d: [60, 40, 40], reg: "BURUN", lock: true, vib: false },
-    { id: "Batarya_Ana", w: 15.0, d: [20, 15, 10], reg: "GOVDE", lock: false, vib: false },
-    { id: "Aviyonik_1", w: 5.0, d: [15, 15, 5], reg: "GOVDE", lock: false, vib: true },
-    { id: "Aviyonik_2", w: 5.0, d: [15, 15, 5], reg: "GOVDE", lock: false, vib: true },
-    { id: "Payload_Kam", w: 10.0, d: [20, 20, 20], reg: "ON_ALT", lock: false, vib: true },
-    { id: "Yakit_Tanki", w: 40.0, d: [50, 40, 30], reg: "MERKEZ", lock: false, vib: false },
-    { id: "Servo_Kuyruk", w: 2.0, d: [5, 5, 5], reg: "KUYRUK", lock: false, vib: false },
+    { id: "Motor", w: 40.0, d: [60, 40, 40], reg: "BURUN", lock: true, vib: false, temp: false },
+    { id: "Batarya_Ana", w: 15.0, d: [20, 15, 10], reg: "GOVDE", lock: false, vib: false, temp: true },
+    { id: "Aviyonik_1", w: 5.0, d: [15, 15, 5], reg: "GOVDE", lock: false, vib: true, temp: true },
+    { id: "Aviyonik_2", w: 5.0, d: [15, 15, 5], reg: "GOVDE", lock: false, vib: true, temp: true },
+    { id: "Payload_Kam", w: 10.0, d: [20, 20, 20], reg: "TABAN", lock: false, vib: true, temp: false },
+    { id: "Yakit_Tanki", w: 40.0, d: [50, 40, 30], reg: "GOVDE", lock: false, vib: false, temp: false },
+    { id: "Servo_Kuyruk", w: 2.0, d: [5, 5, 5], reg: "KUYRUK", lock: false, vib: false, temp: false },
 ];
 
 const tbody = document.getElementById('componentsBody');
@@ -23,6 +23,7 @@ function addComponentRow(data) {
     row.querySelector('.c-region').value = data.reg || 'GOVDE';
     row.querySelector('.c-locked').checked = data.lock || false;
     row.querySelector('.c-vib').checked = data.vib || false;
+    row.querySelector('.c-temp').checked = data.temp || false;
     
     row.querySelector('.del-btn').addEventListener('click', () => {
         row.remove();
@@ -57,7 +58,8 @@ document.getElementById('runBtn').addEventListener('click', async () => {
         target_cg_y: parseFloat(document.getElementById('target_cg_y').value),
         target_cg_z: parseFloat(document.getElementById('target_cg_z').value),
         max_yakit_agirligi: parseFloat(document.getElementById('max_yakit_agirligi').value),
-        titresim_limiti: 50.0, // Optional ui mapping
+        titresim_limiti: parseFloat(document.getElementById('titresim_limiti').value),
+        sicaklik_limiti: parseFloat(document.getElementById('sicaklik_limiti').value),
         pop_size: parseInt(document.getElementById('pop_size').value),
         generations: parseInt(document.getElementById('generations').value),
         algoritma: document.getElementById('algoritma').value,
@@ -81,6 +83,7 @@ document.getElementById('runBtn').addEventListener('click', async () => {
             sabit_bolge: r.querySelector('.c-region').value,
             kilitli: lock,
             titresim_hassasiyeti: r.querySelector('.c-vib').checked,
+            sicaklik_hassasiyeti: r.querySelector('.c-temp').checked,
             sabit_pos: null
         };
         // Mocking fixed pos for nose if locked, for demonstration

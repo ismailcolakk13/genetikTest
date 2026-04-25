@@ -30,6 +30,7 @@ class KomponentRequest(BaseModel):
     sabit_pos: Optional[List[float]] = None
     kilitli: bool
     titresim_hassasiyeti: bool
+    sicaklik_hassasiyeti: bool
 
 class SimulationRequest(BaseModel):
     govde_uzunluk: float
@@ -40,6 +41,7 @@ class SimulationRequest(BaseModel):
     target_cg_z: float
     max_yakit_agirligi: float
     titresim_limiti: float
+    sicaklik_limiti: float
     komponentler: List[KomponentRequest]
     algoritma: str
     pop_size: int
@@ -55,10 +57,11 @@ async def run_simulation(req: SimulationRequest):
                 id=c.id,
                 agirlik=c.agirlik,
                 boyut=tuple(c.boyut),
-                sabit_bolge=c.sabit_bolge,
+                izin_verilen_bolgeler=[c.sabit_bolge] if c.sabit_bolge else [],
                 sabit_pos=tuple(c.sabit_pos) if c.sabit_pos else None,
                 kilitli=c.kilitli,
-                titresim_hassasiyeti=c.titresim_hassasiyeti
+                titresim_hassasiyeti=c.titresim_hassasiyeti,
+                sicaklik_hassasiyeti=c.sicaklik_hassasiyeti
             )
             db_komponents.append(komp)
 
@@ -71,6 +74,7 @@ async def run_simulation(req: SimulationRequest):
             target_cg_z=req.target_cg_z,
             max_yakit_agirligi=req.max_yakit_agirligi,
             titresim_limiti=req.titresim_limiti,
+            sicaklik_limiti=req.sicaklik_limiti,
             komponentler_db=db_komponents
         )
 
@@ -96,7 +100,7 @@ async def run_simulation(req: SimulationRequest):
                      "pos_z": k_pos[2],
                      "boyut": db_item.boyut,
                      "agirlik": db_item.agirlik,
-                     "sabit_bolge": db_item.sabit_bolge
+                     "sabit_bolge": "/".join(db_item.izin_verilen_bolgeler) if db_item.izin_verilen_bolgeler else "SERBEST"
                  }
 
         # Detaylı istatistikleri test etmek isterseniz (fitness vs.) ekleyebiliriz.

@@ -252,6 +252,14 @@ def calculate_fitness_design(birey, aircraft):
         dist_error = ((cg_x - target_x_center)**2 + (cg_y - aircraft.target_cg_y)**2 + (cg_z - aircraft.target_cg_z)**2)**0.5
         toplam_cg_hatasi += dist_error
 
+    # 7. YAKIT TANKI KONUM CEZASI (CG Driftini Minimize Etmek İçin)
+    # Yakıt tankı CG'den ne kadar uzaksa, yakıt tüketimi dengeyi o kadar bozar.
+    yakit_pos = birey.yerlesim.get("Yakit_Tanki")
+    if yakit_pos:
+        target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
+        yakit_drift_cezasi = abs(yakit_pos[0] - target_x_center)
+        puan -= (yakit_drift_cezasi ** 2) * 50  # Kareli ceza ile merkeze zorla
+
     puan -= (toplam_cg_hatasi / len(aircraft.doluluk_oranlari)) * 1000
 
     return puan, dolu_cg_coords
@@ -355,6 +363,13 @@ def calculate_fitness_nsga2(birey, aircraft):
         target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
         dist_error = ((cg_x - target_x_center)**2 + (cg_y - aircraft.target_cg_y)**2 + (cg_z - aircraft.target_cg_z)**2)**0.5
         toplam_cg_hatasi += dist_error
+
+    # 7. YAKIT TANKI KONUM CEZASI
+    yakit_pos = birey.yerlesim.get("Yakit_Tanki")
+    if yakit_pos:
+        target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
+        yakit_drift_cezasi = abs(yakit_pos[0] - target_x_center)
+        ceza_puani += (yakit_drift_cezasi ** 2) * 50
 
     cg_hatasi = toplam_cg_hatasi / len(aircraft.doluluk_oranlari)
 
