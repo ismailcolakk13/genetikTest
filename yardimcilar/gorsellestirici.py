@@ -691,8 +691,25 @@ def ucak_govdesi_olustur(aircraft):
 
     # CESSNA ÖZEL: İniş Takımları (Tricycle Gear)
     z_yer = -aircraft.govde_yaricap - 40
-    traces.append(go.Scatter3d(x=[20, 15], y=[0, 0], z=[-aircraft.govde_yaricap, z_yer], mode='lines+markers', line=dict(color='black', width=6), marker=dict(size=8, color='darkgray'), name='Burun Tekeri'))
-    traces.append(go.Scatter3d(x=[kanat_x_bas+30, kanat_x_bas+15, kanat_x_bas+30], y=[-40, 0, 40], z=[z_yer, -aircraft.govde_yaricap*0.8, z_yer], mode='lines+markers', line=dict(color='black', width=6), marker=dict(size=10, color='darkgray'), name='Ana İniş Takımları'))
+    
+    # 1. Burun İniş Takımı
+    traces.append(go.Scatter3d(x=[20, 15], y=[0, 0], z=[-aircraft.govde_yaricap, z_yer + 5], 
+                               mode='lines', line=dict(color='#666666', width=8), name='Burun Dikmesi', hoverinfo='skip'))
+    traces.extend(_silindir_traces(15, 0, z_yer + 5, r=8, uzunluk=6, yon='y', color='#111111', name='Burun Tekeri', cap=True))
+    traces.extend(_silindir_traces(15, 0, z_yer + 5, r=4, uzunluk=6.5, yon='y', color='#DDDDDD', name='', cap=True)) # Jant
+    
+    # 2. Ana İniş Takımları
+    # Sol Dikme ve Tekerlek
+    traces.append(go.Scatter3d(x=[kanat_x_bas+15, kanat_x_bas+30], y=[0, -45], z=[-aircraft.govde_yaricap*0.8, z_yer + 6], 
+                               mode='lines', line=dict(color='#666666', width=8), name='Sol Ana Dikme', hoverinfo='skip'))
+    traces.extend(_silindir_traces(kanat_x_bas+30, -45, z_yer + 6, r=10, uzunluk=8, yon='y', color='#111111', name='Sol Tekerlek', cap=True))
+    traces.extend(_silindir_traces(kanat_x_bas+30, -45, z_yer + 6, r=5, uzunluk=8.5, yon='y', color='#DDDDDD', name='', cap=True)) # Jant
+    
+    # Sağ Dikme ve Tekerlek
+    traces.append(go.Scatter3d(x=[kanat_x_bas+15, kanat_x_bas+30], y=[0, 45], z=[-aircraft.govde_yaricap*0.8, z_yer + 6], 
+                               mode='lines', line=dict(color='#666666', width=8), name='Sağ Ana Dikme', hoverinfo='skip'))
+    traces.extend(_silindir_traces(kanat_x_bas+30, 45, z_yer + 6, r=10, uzunluk=8, yon='y', color='#111111', name='Sağ Tekerlek', cap=True))
+    traces.extend(_silindir_traces(kanat_x_bas+30, 45, z_yer + 6, r=5, uzunluk=8.5, yon='y', color='#DDDDDD', name='', cap=True)) # Jant
 
     # 3. KUYRUK TAKIMI (TAIL) - Cessna stili geriye yatık (swept back)
     tail_x = aircraft.govde_uzunluk - 50
