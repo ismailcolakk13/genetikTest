@@ -782,9 +782,10 @@ def ozel_parca_ciz(pos, dim, color, name):
         traces.append(silindir_trace(x + dx*0.5, y, z, dx*0.2, dy*0.5, dz*0.5, "darkgray", name + " Egzoz", x, y, z, r_deg, p_deg, yw_deg))
     elif "yakit" in name_lower or "tank" in name_lower:
         yw_deg = 90 # Kanat hizasında uzanması için 90 derece (Y ekseni boyunca) döndürüyoruz
+        x = 105 # Kanadın (gölgenin) tam ortası (kanat_x_bas=80, genislik=50 -> orta nokta 105)
         y_loc_left = y + 90  # Sol kanat altı/içi
         y_loc_right = y - 90 # Sağ kanat altı/içi
-        z_offset = z + 35    # Gövde merkezinden üstte olan kanat hizasına yükseltiyoruz
+        z_offset = z + 32    # Gövde merkezinden üstte olan kanat hizasına yükseltiyoruz
         
         tank_uzunluk = 100
         tank_kalinlik = 18
