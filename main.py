@@ -27,13 +27,40 @@ TITRESIM_LIMITI = 50.0
 SICAKLIK_LIMITI = 30.0  # cm - Motor'a bu mesafeden yakın olan ısıya hassas parçalara ceza
 
 KOMPONENTLER_DB = [ # Bunlar kullanıcıdan alınmalı, geçici olarak burada tanımlı.
-    Komponent(id="Motor", agirlik=40.0, boyut=(60, 40, 40), sabit_bolge="BURUN", sabit_pos=(30, 0, 0), kilitli=True, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
-    Komponent(id="Batarya_Ana", agirlik=15.0, boyut=(20, 15, 10), sabit_bolge="GOVDE", kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=True),
-    Komponent(id="Aviyonik_1", agirlik=5.0, boyut=(15, 15, 5), sabit_bolge="AVIYONIK_BAY", kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=True),
-    Komponent(id="Aviyonik_2", agirlik=5.0, boyut=(15, 15, 5), sabit_bolge="AVIYONIK_BAY", kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=True),
-    Komponent(id="Payload_Kam", agirlik=10.0, boyut=(20, 20, 20), sabit_bolge="ON_ALT", kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=False),
-    Komponent(id="Yakit_Tanki", agirlik=40.0, boyut=(50, 40, 30), sabit_bolge="MERKEZ", kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
-    Komponent(id="Servo_Kuyruk", agirlik=2.0, boyut=(5, 5, 5), sabit_bolge="KUYRUK", kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+    # Motor → BURUN'da sabit, kilitli
+    Komponent(id="Motor",        agirlik=40.0, boyut=(60, 40, 40),
+              izin_verilen_bolgeler=["BURUN"],
+              sabit_pos=(30, 0, 0), kilitli=True,
+              titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+
+    # Batarya → Ağır, denge için merkez/alt gövde
+    Komponent(id="Batarya_Ana",  agirlik=15.0, boyut=(20, 15, 10),
+              izin_verilen_bolgeler=["GOVDE", "TABAN"],
+              kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=True),
+
+    # Aviyonikler → Titreşim ve sıcaklıktan uzak, gövde üst bölgesi
+    Komponent(id="Aviyonik_1",   agirlik=5.0,  boyut=(15, 15, 5),
+              izin_verilen_bolgeler=["GOVDE", "TAVAN"],
+              kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=True),
+
+    Komponent(id="Aviyonik_2",   agirlik=5.0,  boyut=(15, 15, 5),
+              izin_verilen_bolgeler=["GOVDE", "TAVAN"],
+              kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=True),
+
+    # Payload Kamera → Burun altında, görüş alanı için
+    Komponent(id="Payload_Kam",  agirlik=10.0, boyut=(20, 20, 20),
+              izin_verilen_bolgeler=["BURUN", "TABAN"],
+              kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=False),
+
+    # Yakıt Tankı → Denge kritik, sadece gövde merkezi
+    Komponent(id="Yakit_Tanki",  agirlik=40.0, boyut=(50, 40, 30),
+              izin_verilen_bolgeler=["GOVDE"],
+              kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+
+    # Servo → Kuyruk kontrol yüzeyleri
+    Komponent(id="Servo_Kuyruk", agirlik=2.0,  boyut=(5, 5, 5),
+              izin_verilen_bolgeler=["KUYRUK"],
+              kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
 ]
 
 # Aircraft modelini oluştur
