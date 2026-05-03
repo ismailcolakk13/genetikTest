@@ -26,7 +26,9 @@ KOMPONENT_RENKLERI = {
     "Aviyonik_1":   "green",
     "Aviyonik_2":   "darkorange",
     "Payload_Kam":  "deeppink",
-    "Yakit_Tanki":  "sienna",
+    "Yakit_Tanki":     "sienna",
+    "Yakit_Tanki_Sol": "sienna",
+    "Yakit_Tanki_Sag": "sienna",
     "Servo_Kuyruk": "purple",
 }
 _FALLBACK_COLORS = ["red", "blue", "green", "orange", "pink", "brown", "purple", "cyan"]
@@ -649,45 +651,335 @@ def _bolge_yuzey_olustur(bolge_adi, aircraft):
 
 
 # ---------------------------------------------------------------------------
-# UÇAK GÖVDESİ  (değişmedi)
+# KANAT GEOMETRİSİ — NACA Aerofoil Profilli 3D Kanat
 # ---------------------------------------------------------------------------
+
+def _naca4_kalinlik(x_norm, t_c=0.15):
+    """NACA 4-basamak simetrik kanat profilinin normalize kalınlık dağılımı."""
+    x = np.clip(x_norm, 1e-6, 1.0)
+    return (t_c / 0.20) * (
+        0.2969 * np.sqrt(x)
+        - 0.1260 * x
+        - 0.3516 * x ** 2
+        + 0.2843 * x ** 3
+        - 0.1015 * x ** 4
+    )
+
+
+def _tek_kanat_traces(sign, span_half, chord_kok, chord_uc,
+                      x_LE_kok, sweep_deg, dihedral_deg, z_kok,
+                      t_c=0.15, n_span=28, n_chord=22, opacity=0.84):
+    """
+    Tek kanat icin 3D NACA-profilli üst + alt yüzey + ön/arka kenar + wingtip.
+    sign = +1: sağ kanat (y > 0), -1: sol kanat (y < 0)
+    """
+    traces = []
+    color_inner = '#5b9bd5'   # iç (flap bölgesi)
+    color_outer = '#aecde0'   # dış (aileron bölgesi)
+
+    s_vals = np.linspace(0, 1, n_span)
+    c_vals = np.linspace(0, 1, n_chord)
+
+    Xu = np.zeros((n_span, n_chord))
+    Yu = np.zeros((n_span, n_chord))
+    Zu = np.zeros((n_span, n_chord))
+    Xl = np.zeros((n_span, n_chord))
+    Yl = np.zeros((n_span, n_chord))
+    Zl = np.zeros((n_span, n_chord))
+    S_color = np.zeros((n_span, n_chord))
+
+    for i, s in enumerate(s_vals):
+        chord  = chord_kok + (chord_uc - chord_kok) * s
+        x_LE   = x_LE_kok + s * span_half * np.tan(np.radians(sweep_deg))
+        y_pos  = sign * s * span_half
+        z_base = z_kok + s * span_half * np.tan(np.radians(abs(dihedral_deg)))
+        S_color[i, :] = s
+        for j, c in enumerate(c_vals):
+            yt = _naca4_kalinlik(c, t_c) * chord
+            Xu[i, j] = x_LE + c * chord
+            Yu[i, j] = y_pos
+            Zu[i, j] = z_base + yt
+            Xl[i, j] = x_LE + c * chord
+            Yl[i, j] = y_pos
+            Zl[i, j] = z_base - yt
+
+    # Üst yüzey
+    traces.append(go.Surface(
+        x=Xu, y=Yu, z=Zu,
+        colorscale=[[0, color_inner], [1, color_outer]],
+        surfacecolor=S_color,
+        showscale=False, opacity=opacity,
+        name='Ana Kanat',
+        hovertemplate='<b>Ana Kanat</b><extra></extra>',
+    ))
+    # Alt yüzey
+    traces.append(go.Surface(
+        x=Xl, y=Yl, z=Zl,
+        colorscale=[[0, color_inner], [1, color_outer]],
+        surfacecolor=S_color,
+        showscale=False, opacity=opacity * 0.88,
+        name='', hoverinfo='skip', showlegend=False,
+    ))
+
+    # Ön kenar çizgisi
+    le_xs = [x_LE_kok + s * span_half * np.tan(np.radians(sweep_deg)) for s in s_vals]
+    le_ys = [sign * s * span_half for s in s_vals]
+    le_zs = [
+        z_kok + s * span_half * np.tan(np.radians(abs(dihedral_deg)))
+        + _naca4_kalinlik(0.002, t_c) * (chord_kok + (chord_uc - chord_kok) * s)
+        for s in s_vals
+    ]
+    traces.append(go.Scatter3d(
+        x=le_xs, y=le_ys, z=le_zs,
+        mode='lines', line=dict(color='#1a5276', width=2),
+        showlegend=False, hoverinfo='skip',
+    ))
+
+    # Arka kenar çizgisi
+    te_xs = [
+        x_LE_kok + s * span_half * np.tan(np.radians(sweep_deg))
+        + (chord_kok + (chord_uc - chord_kok) * s)
+        for s in s_vals
+    ]
+    te_ys = [sign * s * span_half for s in s_vals]
+    te_zs = [z_kok + s * span_half * np.tan(np.radians(abs(dihedral_deg))) for s in s_vals]
+    traces.append(go.Scatter3d(
+        x=te_xs, y=te_ys, z=te_zs,
+        mode='lines', line=dict(color='#1a5276', width=2),
+        showlegend=False, hoverinfo='skip',
+    ))
+
+    # Wingtip kapağı
+    chord_tip  = chord_uc
+    x_LE_tip   = x_LE_kok + span_half * np.tan(np.radians(sweep_deg))
+    y_tip      = sign * span_half
+    z_tip_base = z_kok + span_half * np.tan(np.radians(abs(dihedral_deg)))
+    tip_xs, tip_ys, tip_zs = [], [], []
+    for c in c_vals:
+        yt = _naca4_kalinlik(c, t_c) * chord_tip
+        tip_xs.append(x_LE_tip + c * chord_tip)
+        tip_ys.append(y_tip)
+        tip_zs.append(z_tip_base + yt)
+    for c in list(reversed(c_vals))[1:]:
+        yt = _naca4_kalinlik(c, t_c) * chord_tip
+        tip_xs.append(x_LE_tip + c * chord_tip)
+        tip_ys.append(y_tip)
+        tip_zs.append(z_tip_base - yt)
+    n_tip = len(tip_xs)
+    tip_xs.append(x_LE_tip + chord_tip * 0.40)
+    tip_ys.append(y_tip)
+    tip_zs.append(z_tip_base)
+    ci = n_tip
+    traces.append(go.Mesh3d(
+        x=tip_xs, y=tip_ys, z=tip_zs,
+        i=[ci] * n_tip,
+        j=list(range(n_tip)),
+        k=list(range(1, n_tip)) + [0],
+        color=color_inner, opacity=opacity,
+        showlegend=False, hoverinfo='skip',
+    ))
+
+    return traces
+
+
+# ---------------------------------------------------------------------------
+# UÇAK GÖVDESİ — İKİ PARÇA: Alt Şasi + Üst Kabin
+# ---------------------------------------------------------------------------
+
+def _superellipse_cross_section(r, n_u, W_scale, H_top_scale, H_bot_scale, p=4.0):
+    """Superellipse (keskin köşeli) normalize kesit noktaları döndürür."""
+    theta = np.linspace(0, 2 * np.pi, n_u)
+    ct = np.cos(theta)
+    st = np.sin(theta)
+    y = W_scale * r * np.sign(ct) * np.abs(ct) ** (2.0 / p)
+    z_top = H_top_scale * r * (np.abs(st) ** (2.0 / p))
+    z_bot = -H_bot_scale * r * (np.abs(st) ** (2.0 / p))
+    z = np.where(st >= 0, z_top, z_bot)
+    return y, z
+
+
+def _lower_fuselage_traces(aircraft):
+    """Alt şasi: Tam uzunluk, flat tabanlı, keskin köşeli superellipse kesit."""
+    traces = []
+    n_x, n_u = 60, 40
+    xs = np.linspace(0, aircraft.govde_uzunluk, n_x)
+    X = np.zeros((n_x, n_u))
+    Y = np.zeros((n_x, n_u))
+    Z = np.zeros((n_x, n_u))
+    for i, x in enumerate(xs):
+        r = aircraft.get_fuselage_radius(x)
+        y_cs, z_cs = _superellipse_cross_section(r, n_u, 1.18, 0.62, 0.52, p=4.0)
+        X[i] = x
+        Y[i] = y_cs
+        Z[i] = z_cs
+    traces.append(go.Surface(
+        x=X, y=Y, z=Z,
+        colorscale=[[0, '#b2b8be'], [1, '#dde0e3']],
+        showscale=False, opacity=0.82, name='Alt Gövde', hoverinfo='skip',
+        surfacecolor=np.zeros((n_x, n_u))
+    ))
+    for i in range(0, n_x, 5):
+        traces.append(go.Scatter3d(
+            x=list(X[i]) + [X[i, 0]], y=list(Y[i]) + [Y[i, 0]], z=list(Z[i]) + [Z[i, 0]],
+            mode='lines', line=dict(color='#2a2a2a', width=1),
+            showlegend=False, hoverinfo='skip'
+        ))
+    return traces
+
+
+def _upper_cabin_traces(aircraft):
+    """Üst kabin (greenhouse): windshield, pencere duvarları, çatı, arka kapı."""
+    traces = []
+    R = aircraft.govde_yaricap
+
+    # Kabin geometri sabitleri
+    x_ws_bot  = 40   # ön cam alt kenarı (firewall)
+    x_ws_top  = 65   # ön cam üst kenarı (geri yatık windshield)
+    x_roof_end = 158  # çatı arka ucu (üst)
+    x_door_end = 168  # kabin arka duvarı alt kenarı
+
+    def _lower_top(x):
+        """Alt şasinin üst yüzey Z koordinatı (= kabin taban Z)."""
+        r = aircraft.get_fuselage_radius(x)
+        return r * 0.62
+
+    def _cabin_width(x):
+        r = aircraft.get_fuselage_radius(x)
+        # Kabin yan duvarlar, alt gövdeden biraz içeride
+        return min(r * 1.18 * 0.72, R * 0.86)
+
+    def _cabin_height(x):
+        # Kabin yüksekliği: öne yakın bölüm daha yüksek, arkaya doğru alçalır
+        t = np.clip((x - x_ws_top) / (x_roof_end - x_ws_top), 0, 1)
+        return R * 1.05 * (1.0 - 0.70 * (t ** 1.8))
+
+    # --- 1. Çatı yüzeyi (curved arc, sol → sağ) ---
+    n_x, n_arc = 36, 18
+    xs_roof = np.linspace(x_ws_top, x_roof_end, n_x)
+    arc_t = np.linspace(np.pi, 0, n_arc)   # sol (-W) → sağ (+W)
+    X_r = np.zeros((n_x, n_arc))
+    Y_r = np.zeros((n_x, n_arc))
+    Z_r = np.zeros((n_x, n_arc))
+    for i, x in enumerate(xs_roof):
+        z_base = _lower_top(x)
+        W = _cabin_width(x)
+        H = _cabin_height(x)
+        for j, t in enumerate(arc_t):
+            X_r[i, j] = x
+            Y_r[i, j] = W * np.cos(t)
+            # Flat-top with slight crown
+            Z_r[i, j] = z_base + H * (1.0 - 0.12 * np.cos(t) ** 2)
+    traces.append(go.Surface(
+        x=X_r, y=Y_r, z=Z_r,
+        colorscale=[[0, '#ccddef'], [1, '#e8f3fb']],
+        showscale=False, opacity=0.78, name='Kabin Çatısı', hoverinfo='skip',
+        surfacecolor=np.zeros((n_x, n_arc))
+    ))
+
+    # --- 2. Sol ve Sağ pencere duvarları (dikey, düz yüzey) ---
+    xs_wall = np.linspace(x_ws_top, x_door_end, n_x)
+    for sign, wall_name in [(+1, 'Sağ Pencere'), (-1, 'Sol Pencere')]:
+        X_w = np.zeros((n_x, 2))
+        Y_w = np.zeros((n_x, 2))
+        Z_w = np.zeros((n_x, 2))
+        for i, x in enumerate(xs_wall):
+            z_base = _lower_top(x)
+            W = _cabin_width(x)
+            # Cabin height tapers to 0 at door_end
+            t_end = np.clip((x - x_roof_end) / (x_door_end - x_roof_end), 0, 1)
+            H = _cabin_height(min(x, x_roof_end)) * (1 - t_end)
+            X_w[i] = [x, x]
+            Y_w[i] = [sign * W, sign * W]
+            Z_w[i] = [z_base, z_base + H]
+        traces.append(go.Surface(
+            x=X_w, y=Y_w, z=Z_w,
+            colorscale=[[0, '#b8d4ec'], [1, '#d4eaf8']],
+            showscale=False, opacity=0.75, name=wall_name, hoverinfo='skip',
+            surfacecolor=np.zeros((n_x, 2))
+        ))
+
+    # --- 3. Windshield (ön cam, eğimli yüzey) ---
+    r_bot = aircraft.get_fuselage_radius(x_ws_bot)
+    r_top = aircraft.get_fuselage_radius(x_ws_top)
+    W_bot = r_bot * 1.18 * 0.72
+    W_top = r_top * 1.18 * 0.72
+    z_bot = _lower_top(x_ws_bot)
+    z_top = _lower_top(x_ws_top) + _cabin_height(x_ws_top)
+    ws_x = [x_ws_bot, x_ws_bot, x_ws_top, x_ws_top]
+    ws_y = [-W_bot,    W_bot,    W_top,   -W_top]
+    ws_z = [z_bot,     z_bot,    z_top,    z_top]
+    traces.append(go.Mesh3d(
+        x=ws_x, y=ws_y, z=ws_z,
+        i=[0, 0], j=[1, 2], k=[2, 3],
+        color='#a0c8e8', opacity=0.65, name='Ön Cam',
+        showlegend=False, hoverinfo='skip'
+    ))
+
+    # --- 4. Arka kapı yüzeyi ---
+    x_rb = x_door_end
+    r_rb = aircraft.get_fuselage_radius(x_rb)
+    W_rb = r_rb * 1.18 * 0.72
+    z_rb_bot = _lower_top(x_rb)
+    z_rb_top = z_rb_bot + 0.01   # kapı arkası neredeyse kapanmış
+    rb_x = [x_rb,   x_rb,   x_rb,   x_rb]
+    rb_y = [-W_rb,   W_rb,   W_rb,  -W_rb]
+    rb_z = [z_rb_bot, z_rb_bot, z_rb_top, z_rb_top]
+    traces.append(go.Mesh3d(
+        x=rb_x, y=rb_y, z=rb_z,
+        i=[0, 0], j=[1, 2], k=[2, 3],
+        color='#90b8d8', opacity=0.72, name='Arka Kabin',
+        showlegend=False, hoverinfo='skip'
+    ))
+
+    return traces
+
 
 def ucak_govdesi_olustur(aircraft):
     traces = []
 
-    u = np.linspace(0, 2 * np.pi, 20)
-    v = np.linspace(0, aircraft.govde_uzunluk, 40)
-    u, v = np.meshgrid(u, v)
-    r_values = np.array([aircraft.get_fuselage_radius(x) for x in v.flatten()]).reshape(v.shape)
-    x_govde = v
-    y_govde = r_values * np.cos(u)
-    z_govde = r_values * np.sin(u) * 1.2
-    
-    traces.append(go.Surface(
-        x=x_govde, y=y_govde, z=z_govde, opacity=0.15, colorscale='Greys', showscale=False, name='Gövde', hoverinfo='skip'
-    ))
-    for i in range(0, 40, 4): 
-        traces.append(go.Scatter3d(x=x_govde[i], y=y_govde[i], z=z_govde[i], mode='lines', line=dict(color='black', width=1), showlegend=False, hoverinfo='skip'))
+    # --- Gövde: İki ayrı parça ---
+    traces.extend(_lower_fuselage_traces(aircraft))   # Alt şasi
+    traces.extend(_upper_cabin_traces(aircraft))       # Üst kabin/greenhouse
 
-    # 2. KANATLAR (High Wing - Üstten Kanat)
-    kanat_x_bas = 80
-    kanat_genislik = 50 
-    kanat_uzunluk = 360 
-    z_kanat = aircraft.govde_yaricap * 1.1 
-    
-    x_w = [kanat_x_bas, kanat_x_bas+kanat_genislik, kanat_x_bas+kanat_genislik, kanat_x_bas]
-    y_w = [-kanat_uzunluk/2, -kanat_uzunluk/2, kanat_uzunluk/2, kanat_uzunluk/2]
-    z_w = [z_kanat, z_kanat, z_kanat, z_kanat]
-    traces.append(go.Mesh3d(x=x_w, y=y_w, z=z_w, color='lightblue', opacity=0.4, name='Ana Kanat', i=[0, 0], j=[1, 2], k=[2, 3]))
+    # 2. KANATLAR — 3D NACA Aerofoil Profilli High-Wing (Cessna 172 ölçüleri)
+    kanat_x_bas  = 80           # Ön kenar kök X pozisyonu
+    kanat_uzunluk = 360         # Toplam açıklık (span)
+    span_half    = kanat_uzunluk / 2
+    chord_kok    = 53           # Kök chord (cm)  — C172 ≈ 1.63 m
+    chord_uc     = 36           # Uç chord (cm)   — C172 ≈ 1.09 m
+    sweep_deg    = 1.5          # Ön kenar sweep açısı (°)
+    dihedral_deg = 1.7          # Dihedral açısı (°) — C172 ~1.7°
+    t_c          = 0.24         # Kalınlık / Chord oranı (kanat içi tank için: 0.24×53cm=12.7cm ≥ 8cm tank)
+    # Kanat yüksekliği = kabin çatısının üstü (high-wing: kanat kabinin üstüne oturur)
+    # kanat_x_bas konumundaki kabin tavan Z'si: alt_yüzey_üstü + kabin_yüksekliği
+    R = aircraft.govde_yaricap
+    x_ws_top_ref = 65
+    x_roof_end_ref = 158
+    def _cabin_top_z(x):
+        r = aircraft.get_fuselage_radius(x)
+        z_base = r * 0.62
+        t = np.clip((x - x_ws_top_ref) / (x_roof_end_ref - x_ws_top_ref), 0, 1)
+        h = R * 1.05 * (1.0 - 0.70 * (t ** 1.8))
+        return z_base + h
+    z_kok = _cabin_top_z(kanat_x_bas)  # Kanat, kabin çatısından çıkar
+
+    for tr in _tek_kanat_traces(+1, span_half, chord_kok, chord_uc,
+                                 kanat_x_bas, sweep_deg, dihedral_deg, z_kok, t_c):
+        traces.append(tr)
+    for tr in _tek_kanat_traces(-1, span_half, chord_kok, chord_uc,
+                                 kanat_x_bas, sweep_deg, dihedral_deg, z_kok, t_c):
+        traces.append(tr)
 
     # CESSNA ÖZEL: Pervane Diski (Propeller)
     theta = np.linspace(0, 2*np.pi, 30)
     r_prop = 45
     traces.append(go.Mesh3d(x=[0]*len(theta), y=r_prop*np.cos(theta), z=r_prop*np.sin(theta), alphahull=0, color='silver', opacity=0.3, name='Pervane Diski', hoverinfo='skip'))
 
-    # CESSNA ÖZEL: Kanat Destek Dikmeleri (Wing Struts)
-    traces.append(go.Scatter3d(x=[kanat_x_bas+10, kanat_x_bas+10], y=[-aircraft.govde_yaricap, -kanat_uzunluk/3], z=[-aircraft.govde_yaricap*0.8, z_kanat], mode='lines', line=dict(color='gray', width=4), name='Sol Dikme'))
-    traces.append(go.Scatter3d(x=[kanat_x_bas+10, kanat_x_bas+10], y=[aircraft.govde_yaricap, kanat_uzunluk/3], z=[-aircraft.govde_yaricap*0.8, z_kanat], mode='lines', line=dict(color='gray', width=4), name='Sağ Dikme'))
+    # CESSNA ÖZEL: Kanat Destek Dikmeleri (Wing Struts) — dihedral'e göre güncellendi
+    strut_y   = span_half / 3
+    strut_z   = z_kok + strut_y * np.tan(np.radians(dihedral_deg)) - chord_kok * t_c * 0.5
+    traces.append(go.Scatter3d(x=[kanat_x_bas+15, kanat_x_bas+15], y=[-aircraft.govde_yaricap, -strut_y], z=[-aircraft.govde_yaricap*0.8, strut_z], mode='lines', line=dict(color='gray', width=4), name='Sol Dikme'))
+    traces.append(go.Scatter3d(x=[kanat_x_bas+15, kanat_x_bas+15], y=[aircraft.govde_yaricap,  strut_y], z=[-aircraft.govde_yaricap*0.8, strut_z], mode='lines', line=dict(color='gray', width=4), name='Sağ Dikme'))
 
     # CESSNA ÖZEL: İniş Takımları (Tricycle Gear)
     z_yer = -aircraft.govde_yaricap - 40
@@ -766,7 +1058,7 @@ def elipsoit_trace(x, y, z, dx, dy, dz, color, name, cx, cy, cz, r=0, p=0, yw=0)
     xs, ys, zs = dondur_3d(xs, ys, zs, cx, cy, cz, r, p, yw)
     return go.Mesh3d(x=xs, y=ys, z=zs, alphahull=0, color=color, name=name, hoverinfo='name')
 
-def ozel_parca_ciz(pos, dim, color, name):
+def ozel_parca_ciz(pos, dim, color, name, aircraft=None):
     """Komponentleri isimlerine göre girintili çıkıntılı (karmaşık) geometriler olarak çizer"""
     x, y, z = pos
     dx, dy, dz = dim
@@ -781,22 +1073,59 @@ def ozel_parca_ciz(pos, dim, color, name):
         traces.append(elipsoit_trace(x - dx*0.4, y, z, dx*0.2, dy*0.8, dz*0.8, "silver", name + " Koni", x, y, z, r_deg, p_deg, yw_deg))
         traces.append(silindir_trace(x + dx*0.5, y, z, dx*0.2, dy*0.5, dz*0.5, "darkgray", name + " Egzoz", x, y, z, r_deg, p_deg, yw_deg))
     elif "yakit" in name_lower or "tank" in name_lower:
-        yw_deg = 90 # Kanat hizasında uzanması için 90 derece (Y ekseni boyunca) döndürüyoruz
-        x = 105 # Kanadın (gölgenin) tam ortası (kanat_x_bas=80, genislik=50 -> orta nokta 105)
-        y_loc_left = y + 90  # Sol kanat altı/içi
-        y_loc_right = y - 90 # Sağ kanat altı/içi
-        z_offset = z + 32    # Gövde merkezinden üstte olan kanat hizasına yükseltiyoruz
-        
-        tank_uzunluk = 100
-        tank_kalinlik = 18
-        
-        # Sol Kanat Yakıt Tankı (Hap formu yakalamak için silindir+elipsoit kombinasyonu)
-        traces.append(silindir_trace(x, y_loc_left, z_offset, tank_uzunluk, tank_kalinlik, tank_kalinlik, color, name+"_Sol", x, y_loc_left, z_offset, r_deg, p_deg, yw_deg))
-        traces.append(elipsoit_trace(x, y_loc_left, z_offset, tank_uzunluk + 20, tank_kalinlik, tank_kalinlik, color, name+"_Sol", x, y_loc_left, z_offset, r_deg, p_deg, yw_deg))
-        
-        # Sağ Kanat Yakıt Tankı
-        traces.append(silindir_trace(x, y_loc_right, z_offset, tank_uzunluk, tank_kalinlik, tank_kalinlik, color, name+"_Sag", x, y_loc_right, z_offset, r_deg, p_deg, yw_deg))
-        traces.append(elipsoit_trace(x, y_loc_right, z_offset, tank_uzunluk + 20, tank_kalinlik, tank_kalinlik, color, name+"_Sag", x, y_loc_right, z_offset, r_deg, p_deg, yw_deg))
+        # --- Kanat içi tank: kanat geometrisine göre doğru konumlandır ---
+        # Kanat parametreleri (ucak_govdesi_olustur ile tam senkron)
+        kanat_x_bas  = 80.0
+        sweep_deg    = 1.5
+        dihedral_deg = 1.7
+        chord_kok_w  = 53.0
+        chord_uc_w   = 36.0
+        span_half_w  = 180.0
+
+        sign = +1 if "sol" in name_lower else -1
+
+        # --- Y: gövde dışından başla, tank uzunluğu kadar iç kanata uzat ---
+        # Gövde yarı-genişliği (superellipse ile aynı ölçek 1.18)
+        if aircraft is not None:
+            fus_hw = aircraft.get_fuselage_radius(kanat_x_bas + chord_kok_w / 2) * 1.18
+        else:
+            fus_hw = 35.0
+        gap       = 2.0              # gövde ile tank arası boşluk
+        tank_span = dx               # boyut[0]=55cm span yönü
+        span_start = fus_hw + gap    # ≈ 37cm (gövde dış kenarı + boşluk)
+        span_end   = span_start + tank_span  # ≈ 92cm
+        y_center   = sign * (span_start + span_end) / 2  # ≈ ±64.5cm
+
+        # --- Y'ye karşılık gelen span oranı ---
+        s = abs(y_center) / span_half_w   # ≈0.36
+
+        # --- X: kanat LE..TE aralığına klampla ---
+        chord_at_s = chord_kok_w + (chord_uc_w - chord_kok_w) * s
+        x_LE = kanat_x_bas + s * span_half_w * np.tan(np.radians(sweep_deg))
+        x_TE = x_LE + chord_at_s
+        half_chord_box = dy / 2          # boyut[1]=35cm → chord yarısı
+        x_tank = np.clip(x, x_LE + half_chord_box, x_TE - half_chord_box)
+
+        # --- Z: kanat nötr çizgisi ---
+        # z_kok DAIMA kanat_x_bas=80'de hesaplanır (ucak_govdesi_olustur ile aynı)
+        if aircraft is not None:
+            R_w   = aircraft.govde_yaricap
+            r_w   = aircraft.get_fuselage_radius(kanat_x_bas)  # x=80, x_tank DEĞİL
+            z_b   = r_w * 0.62
+            t_cl  = np.clip((kanat_x_bas - 65.0) / (158.0 - 65.0), 0.0, 1.0)
+            h_cab = R_w * 1.05 * (1.0 - 0.70 * (t_cl ** 1.8))
+            z_kok_w = z_b + h_cab
+        else:
+            z_kok_w = z
+        z_tank = z_kok_w + abs(y_center) * np.tan(np.radians(dihedral_deg))
+
+        # --- Kutu: chord(X) × span(Y) × kalinlik(Z) ---
+        #  box_dx = dy (35cm chord), box_dy = tank_span (55cm span), box_dz = dz (8cm kalınlık)
+        traces.append(kutu_trace(x_tank, y_center, z_tank,
+                                  dy, tank_span, dz,
+                                  color, name,
+                                  x_tank, y_center, z_tank,
+                                  r_deg, p_deg, yw_deg))
     elif "kam" in name_lower or "payload" in name_lower:
         p_deg = -35 # Kamera merceği yere doğru bakar (-35 pitch)
         traces.append(kutu_trace(x, y, z + dz*0.2, dx, dy, dz*0.6, color, name, x, y, z, r_deg, p_deg, yw_deg))
@@ -845,7 +1174,7 @@ def gorsellestir_tasarim(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITM
         colors = ['red', 'blue', 'orange', 'purple', 'green', 'brown', 'cyan']
         
         # Kutuları girintili çıkıntılı çiz
-        karma_parcalar = ozel_parca_ciz(pos, boyut, colors[idx % len(colors)], k_id)
+        karma_parcalar = ozel_parca_ciz(pos, boyut, colors[idx % len(colors)], k_id, aircraft)
         for t in karma_parcalar:
             fig.add_trace(t)
         

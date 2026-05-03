@@ -24,13 +24,21 @@ def analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
 
     # 2. Yakıt Tankı Etkisi Kontrolü
     # Yakıt tankı ağırlık merkezinden (CG) ne kadar uzaksa, yakıt azaldıkça uçağın dengesi o kadar bozulur.
-    yakit_pos = en_iyi_tasarim.yerlesim.get("Yakit_Tanki", (0, 0, 0))
+    # Sol ve Sağ tank konumlarının ortalama X'i kullanılır
+    yakit_sol = en_iyi_tasarim.yerlesim.get("Yakit_Tanki_Sol")
+    yakit_sag = en_iyi_tasarim.yerlesim.get("Yakit_Tanki_Sag")
+    if yakit_sol and yakit_sag:
+        yakit_pos = ((yakit_sol[0] + yakit_sag[0]) / 2,
+                     (yakit_sol[1] + yakit_sag[1]) / 2,
+                     (yakit_sol[2] + yakit_sag[2]) / 2)
+    else:
+        yakit_pos = en_iyi_tasarim.yerlesim.get("Yakit_Tanki", (0, 0, 0))
     hedef_merkez_x = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
 
     if abs(yakit_pos[0] - hedef_merkez_x) > 10.0:
-        print(f"⛽ Yakıt tankının X konumu ({yakit_pos[0]:.1f}) ideal merkezden uzak. Yakıt tüketimi CG'yi ETKİLEYECEK.")
+        print(f"⛽ Yakıt tanklarının X konumu ({yakit_pos[0]:.1f}) ideal merkezden uzak. Yakıt tüketimi CG'yi ETKİLEYECEK.")
     else:
-        print(f"⛽ Yakıt tankı ideal merkeze çok yakın. Yakıt tüketiminin dengeye etkisi MİNİMUM.")
+        print(f"⛽ Yakıt tankları ideal merkeze çok yakın. Yakıt tüketiminin dengeye etkisi MİNİMUM.")
 
     # 3. Genel Skor Yorumu
     # Ceza sistemi olduğu için skor 0'a ne kadar yakınsa (negatif değerler) o kadar iyidir.
@@ -76,8 +84,11 @@ def analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
         bos_agirlik += mass
         bos_moment_x += mass * pos[0]
 
-        # Dolu depo için moment (Yakıt = MAX)
-        if k_id == "Yakit_Tanki":
+        # Dolu depo için moment (Yakıt = MAX, Sol+Sağ eşit pay)
+        if k_id in ("Yakit_Tanki_Sol", "Yakit_Tanki_Sag"):
+            dolu_agirlik += (mass + aircraft.max_yakit_agirligi * 0.5)
+            dolu_moment_x += (mass + aircraft.max_yakit_agirligi * 0.5) * pos[0]
+        elif k_id == "Yakit_Tanki":
             dolu_agirlik += (mass + aircraft.max_yakit_agirligi)
             dolu_moment_x += (mass + aircraft.max_yakit_agirligi) * pos[0]
         else:

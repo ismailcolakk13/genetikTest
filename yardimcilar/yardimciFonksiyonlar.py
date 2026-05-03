@@ -234,8 +234,8 @@ def calculate_fitness_design(birey, aircraft):
         for k_id, pos in birey.yerlesim.items():
             db_item = next(item for item in aircraft.komponentler_db if item.id == k_id)
             mass = db_item.agirlik
-            if k_id == "Yakit_Tanki":
-                mass += aircraft.max_yakit_agirligi * doluluk
+            if k_id in ("Yakit_Tanki_Sol", "Yakit_Tanki_Sag"):
+                mass += aircraft.max_yakit_agirligi * doluluk * 0.5  # Her tank yarı yakıt taşır
             total_mass += mass
             moment_x += mass * pos[0]
             moment_y += mass * pos[1]
@@ -254,11 +254,12 @@ def calculate_fitness_design(birey, aircraft):
 
     # 7. YAKIT TANKI KONUM CEZASI (CG Driftini Minimize Etmek İçin)
     # Yakıt tankı CG'den ne kadar uzaksa, yakıt tüketimi dengeyi o kadar bozar.
-    yakit_pos = birey.yerlesim.get("Yakit_Tanki")
-    if yakit_pos:
-        target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
-        yakit_drift_cezasi = abs(yakit_pos[0] - target_x_center)
-        puan -= (yakit_drift_cezasi ** 2) * 50  # Kareli ceza ile merkeze zorla
+    for tank_id in ("Yakit_Tanki_Sol", "Yakit_Tanki_Sag"):
+        yakit_pos = birey.yerlesim.get(tank_id)
+        if yakit_pos:
+            target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
+            yakit_drift_cezasi = abs(yakit_pos[0] - target_x_center)
+            puan -= (yakit_drift_cezasi ** 2) * 25  # iki tank, toplam ağırlık aynı
 
     puan -= (toplam_cg_hatasi / len(aircraft.doluluk_oranlari)) * 1000
 
@@ -346,8 +347,8 @@ def calculate_fitness_nsga2(birey, aircraft):
         for k_id, pos in birey.yerlesim.items():
             db_item = next(item for item in aircraft.komponentler_db if item.id == k_id)
             mass = db_item.agirlik
-            if k_id == "Yakit_Tanki":
-                mass += aircraft.max_yakit_agirligi * doluluk
+            if k_id in ("Yakit_Tanki_Sol", "Yakit_Tanki_Sag"):
+                mass += aircraft.max_yakit_agirligi * doluluk * 0.5
             total_mass += mass
             moment_x += mass * pos[0]
             moment_y += mass * pos[1]
@@ -365,11 +366,12 @@ def calculate_fitness_nsga2(birey, aircraft):
         toplam_cg_hatasi += dist_error
 
     # 7. YAKIT TANKI KONUM CEZASI
-    yakit_pos = birey.yerlesim.get("Yakit_Tanki")
-    if yakit_pos:
-        target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
-        yakit_drift_cezasi = abs(yakit_pos[0] - target_x_center)
-        ceza_puani += (yakit_drift_cezasi ** 2) * 50
+    for tank_id in ("Yakit_Tanki_Sol", "Yakit_Tanki_Sag"):
+        yakit_pos = birey.yerlesim.get(tank_id)
+        if yakit_pos:
+            target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
+            yakit_drift_cezasi = abs(yakit_pos[0] - target_x_center)
+            ceza_puani += (yakit_drift_cezasi ** 2) * 25
 
     cg_hatasi = toplam_cg_hatasi / len(aircraft.doluluk_oranlari)
 

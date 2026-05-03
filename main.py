@@ -52,8 +52,12 @@ KOMPONENTLER_DB = [ # Bunlar kullanıcıdan alınmalı, geçici olarak burada ta
               izin_verilen_bolgeler=["BURUN", "TABAN"],
               kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=False),
 
-    # Yakıt Tankı → Denge kritik, sadece gövde merkezi
-    Komponent(id="Yakit_Tanki",  agirlik=40.0, boyut=(50, 40, 30),
+    # Yakıt Tankları → Simetrik, kanat kökü bölgesi (sağ + sol kanat)
+    Komponent(id="Yakit_Tanki_Sol", agirlik=20.0, boyut=(55, 35, 8),
+              izin_verilen_bolgeler=["GOVDE"],
+              kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+
+    Komponent(id="Yakit_Tanki_Sag", agirlik=20.0, boyut=(55, 35, 8),
               izin_verilen_bolgeler=["GOVDE"],
               kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
 
