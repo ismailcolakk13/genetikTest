@@ -52,31 +52,50 @@ KOMPONENTLER_DB = [ # Bunlar kullanıcıdan alınmalı, geçici olarak burada ta
               izin_verilen_bolgeler=["BURUN", "TABAN"],
               kilitli=False, titresim_hassasiyeti=True, sicaklik_hassasiyeti=False),
 
-    # Yakıt Tankları → Simetrik, kanat kökü bölgesi (sağ + sol kanat)
-    Komponent(id="Yakit_Tanki_Sol", agirlik=20.0, boyut=(55, 35, 8),
+    # Yakıt Tankları → Kanat içi, span boyunca uzun kapsül (Cessna 172 wet wing)
+    # boyut: (span_uzunlugu, chord_genisligi, kalinlik) — kanat geometrisini takip eder
+    Komponent(id="Yakit_Tanki_Sol", agirlik=20.0, boyut=(110, 22, 6),
               izin_verilen_bolgeler=["GOVDE"],
               kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
 
-    Komponent(id="Yakit_Tanki_Sag", agirlik=20.0, boyut=(55, 35, 8),
+    Komponent(id="Yakit_Tanki_Sag", agirlik=20.0, boyut=(110, 22, 6),
               izin_verilen_bolgeler=["GOVDE"],
               kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
 
-    # Servo → Kuyruk kontrol yüzeyleri
+    # Servo → Kuyruk trim servosu (Cessna manuel kabloludur, küçük trim servosu temsili)
     Komponent(id="Servo_Kuyruk", agirlik=2.0,  boyut=(5, 5, 5),
               izin_verilen_bolgeler=["KUYRUK"],
               kilitli=False, titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
 
-    # Pilot koltuğu → Motor arkası, kabin sol koltuk (sabit konum: x=80, motor x=60'da biter)
-    # Boyut (30, 15, 40): yan yana iki koltuk gövdeye sığacak şekilde dar tutuldu
+    # === KOLTUKLAR (Cessna 172: 2 ön + 2 arka) ===
+    # Pilot (sol ön) → Motor arkası, kabin (sabit konum)
     Komponent(id="Koltuk_Pilot",    agirlik=8.0, boyut=(30, 15, 40),
               izin_verilen_bolgeler=["GOVDE", "TABAN"],
               sabit_pos=(80, -8, 0), kilitli=True,
               titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
 
-    # Yardımcı pilot koltuğu → Sağ koltuk, pilotun yanında
+    # Yardımcı pilot (sağ ön)
     Komponent(id="Koltuk_Yardimci", agirlik=8.0, boyut=(30, 15, 40),
               izin_verilen_bolgeler=["GOVDE", "TABAN"],
               sabit_pos=(80, 8, 0), kilitli=True,
+              titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+
+    # Arka sol yolcu koltuğu
+    Komponent(id="Koltuk_Arka_Sol", agirlik=7.0, boyut=(28, 15, 38),
+              izin_verilen_bolgeler=["GOVDE", "TABAN"],
+              sabit_pos=(120, -8, 0), kilitli=True,
+              titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+
+    # Arka sağ yolcu koltuğu
+    Komponent(id="Koltuk_Arka_Sag", agirlik=7.0, boyut=(28, 15, 38),
+              izin_verilen_bolgeler=["GOVDE", "TABAN"],
+              sabit_pos=(120, 8, 0), kilitli=True,
+              titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+
+    # Bagaj bölmesi → Arka koltukların arkasında (Cessna 172 baggage area)
+    Komponent(id="Bagaj",           agirlik=15.0, boyut=(35, 30, 22),
+              izin_verilen_bolgeler=["GOVDE"],
+              sabit_pos=(160, 0, -2), kilitli=True,
               titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
 ]
 
