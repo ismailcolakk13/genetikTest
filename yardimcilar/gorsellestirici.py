@@ -668,7 +668,7 @@ def _naca4_kalinlik(x_norm, t_c=0.15):
 
 def _tek_kanat_traces(sign, span_half, chord_kok, chord_uc,
                       x_LE_kok, sweep_deg, dihedral_deg, z_kok,
-                      t_c=0.15, n_span=28, n_chord=22, opacity=0.84):
+                      t_c=0.15, n_span=28, n_chord=22, opacity=0.30):
     """
     Tek kanat icin 3D NACA-profilli üst + alt yüzey + ön/arka kenar + wingtip.
     sign = +1: sağ kanat (y > 0), -1: sol kanat (y < 0)
@@ -815,7 +815,7 @@ def _lower_fuselage_traces(aircraft):
     traces.append(go.Surface(
         x=X, y=Y, z=Z,
         colorscale=[[0, '#b2b8be'], [1, '#dde0e3']],
-        showscale=False, opacity=0.82, name='Alt Gövde', hoverinfo='skip',
+        showscale=False, opacity=0.20, name='Alt Gövde', hoverinfo='skip',
         surfacecolor=np.zeros((n_x, n_u))
     ))
     for i in range(0, n_x, 5):
@@ -872,7 +872,7 @@ def _upper_cabin_traces(aircraft):
     traces.append(go.Surface(
         x=X_r, y=Y_r, z=Z_r,
         colorscale=[[0, '#ccddef'], [1, '#e8f3fb']],
-        showscale=False, opacity=0.78, name='Kabin Çatısı', hoverinfo='skip',
+        showscale=False, opacity=0.22, name='Kabin Çatısı', hoverinfo='skip',
         surfacecolor=np.zeros((n_x, n_arc))
     ))
 
@@ -894,7 +894,7 @@ def _upper_cabin_traces(aircraft):
         traces.append(go.Surface(
             x=X_w, y=Y_w, z=Z_w,
             colorscale=[[0, '#b8d4ec'], [1, '#d4eaf8']],
-            showscale=False, opacity=0.75, name=wall_name, hoverinfo='skip',
+            showscale=False, opacity=0.28, name=wall_name, hoverinfo='skip',
             surfacecolor=np.zeros((n_x, 2))
         ))
 
@@ -911,7 +911,7 @@ def _upper_cabin_traces(aircraft):
     traces.append(go.Mesh3d(
         x=ws_x, y=ws_y, z=ws_z,
         i=[0, 0], j=[1, 2], k=[2, 3],
-        color='#a0c8e8', opacity=0.65, name='Ön Cam',
+        color='#a0c8e8', opacity=0.38, name='Ön Cam',
         showlegend=False, hoverinfo='skip'
     ))
 
@@ -927,7 +927,7 @@ def _upper_cabin_traces(aircraft):
     traces.append(go.Mesh3d(
         x=rb_x, y=rb_y, z=rb_z,
         i=[0, 0], j=[1, 2], k=[2, 3],
-        color='#90b8d8', opacity=0.72, name='Arka Kabin',
+        color='#90b8d8', opacity=0.30, name='Arka Kabin',
         showlegend=False, hoverinfo='skip'
     ))
 
