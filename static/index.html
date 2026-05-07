@@ -1,187 +1,251 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AeroOpt - Component Layout Optimizer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>AeroOpt — Aircraft Component Layout Optimizer</title>
+    <meta name="description" content="AI-powered aircraft component layout optimization using Genetic Algorithm, PSO, and NSGA-II multi-objective solvers.">
     <link rel="stylesheet" href="style.css">
-    <!-- Ionicons for some elegant icons -->
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
-    <!-- Three.js or simple CSS visualizer later, for now we will show the layout logic -->
 </head>
-<body class="dark-theme">
-    <div class="app-container">
-        
-        <!-- Sidebar Configuration -->
-        <aside class="sidebar glass-panel">
-            <h1 class="brand">
-                <ion-icon name="airplane-outline"></ion-icon> AeroOpt.
-            </h1>
-            <p class="subtitle">Aircraft Geometry & AI Optimization Dashboard</p>
+<body>
+<div class="app-shell">
 
-            <div class="form-section">
-                <h3>Global Parameters</h3>
-                <div class="input-group">
-                    <label>Fuselage Length (cm)</label>
-                    <input type="number" id="govde_uzunluk" value="300" step="10">
+    <!-- ─── TOP BAR ─── -->
+    <header class="top-bar">
+        <a class="brand" href="/">
+            <div class="brand-icon">✈</div>
+            <span class="brand-name">AeroOpt</span>
+            <span class="brand-tag">v2.0</span>
+        </a>
+        <div class="top-bar-actions">
+            <div class="pulse-dot" data-tooltip="Backend Connected"></div>
+        </div>
+    </header>
+
+    <div class="main-layout">
+
+        <!-- ─── SIDEBAR ─── -->
+        <aside class="sidebar">
+
+            <!-- Aircraft Geometry -->
+            <div class="sidebar-section">
+                <div class="section-label">
+                    <ion-icon name="cube-outline"></ion-icon> Aircraft Geometry
                 </div>
-                <div class="input-group">
-                    <label>Fuselage Diameter (cm)</label>
-                    <input type="number" id="govde_cap" value="60" step="5">
+                <div class="field-row">
+                    <div class="field">
+                        <label>Fuselage Length (cm)</label>
+                        <input type="number" id="govde_uzunluk" value="300" step="10">
+                    </div>
+                    <div class="field">
+                        <label>Fuselage Diameter (cm)</label>
+                        <input type="number" id="govde_cap" value="60" step="5">
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>Target CG (X Min/Max)</label>
-                    <div class="split-inputs">
+            </div>
+
+            <!-- CG Targets -->
+            <div class="sidebar-section">
+                <div class="section-label">
+                    <ion-icon name="locate-outline"></ion-icon> CG Target Envelope
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label>CG X Min</label>
                         <input type="number" id="target_cg_x_min" value="110" step="1">
+                    </div>
+                    <div class="field">
+                        <label>CG X Max</label>
                         <input type="number" id="target_cg_x_max" value="130" step="1">
                     </div>
                 </div>
-                <div class="input-group">
-                    <label>Target CG (Y, Z)</label>
-                    <div class="split-inputs">
+                <div class="field-row">
+                    <div class="field">
+                        <label>CG Y</label>
                         <input type="number" id="target_cg_y" value="0.0" step="0.1">
+                    </div>
+                    <div class="field">
+                        <label>CG Z</label>
                         <input type="number" id="target_cg_z" value="0.0" step="0.1">
                     </div>
                 </div>
-                <div class="input-group">
-                    <label>Max Fuel (kg)</label>
+            </div>
+
+            <!-- Constraints -->
+            <div class="sidebar-section">
+                <div class="section-label">
+                    <ion-icon name="shield-checkmark-outline"></ion-icon> Constraints
+                </div>
+                <div class="field">
+                    <label>Max Fuel Weight (kg)</label>
                     <input type="number" id="max_yakit_agirligi" value="50.0" step="1">
                 </div>
-                <div class="input-group">
-                    <label>Temp Limit (cm)</label>
-                    <input type="number" id="sicaklik_limiti" value="30.0" step="1">
-                </div>
-                <div class="input-group">
-                    <label>Vibration Limit (cm)</label>
-                    <input type="number" id="titresim_limiti" value="50.0" step="1">
+                <div class="field-row">
+                    <div class="field">
+                        <label>Temp Limit (cm)</label>
+                        <input type="number" id="sicaklik_limiti" value="30.0" step="1">
+                    </div>
+                    <div class="field">
+                        <label>Vibration Limit (cm)</label>
+                        <input type="number" id="titresim_limiti" value="50.0" step="1">
+                    </div>
                 </div>
             </div>
 
-            <div class="form-section">
-                <h3>Solver configuration</h3>
-                <div class="input-group">
+            <!-- Solver -->
+            <div class="sidebar-section">
+                <div class="section-label">
+                    <ion-icon name="flask-outline"></ion-icon> Solver Configuration
+                </div>
+                <div class="field">
                     <label>Algorithm</label>
                     <select id="algoritma">
-                        <option value="GA">🌿 Genetic Algorithm (GA)</option>
-                        <option value="PSO">🦅 Particle Swarm (PSO)</option>
-                        <option value="NSGA2">🎯 Multi-Objective (NSGA-II)</option>
+                        <option value="GA">🧬 Genetic Algorithm (GA)</option>
+                        <option value="PSO">🦅 Particle Swarm Optimization (PSO)</option>
+                        <option value="NSGA2">🎯 NSGA-II Multi-Objective</option>
                     </select>
                 </div>
-                <div class="input-group">
-                    <label>Population Size</label>
-                    <input type="number" id="pop_size" value="100" step="10">
-                </div>
-                <div class="input-group">
-                    <label>Generations</label>
-                    <input type="number" id="generations" value="50" step="5">
+                <div class="field-row">
+                    <div class="field">
+                        <label>Population</label>
+                        <input type="number" id="pop_size" value="100" step="10">
+                    </div>
+                    <div class="field">
+                        <label>Generations</label>
+                        <input type="number" id="generations" value="50" step="5">
+                    </div>
                 </div>
             </div>
 
-            <button id="runBtn" class="primary-btn">
-                <ion-icon name="play-outline"></ion-icon> Run Optimization Sequence
-            </button>
-            <div id="loading" class="loading-bar">
-                <div class="bar"></div>
+            <!-- Run Button -->
+            <div class="sidebar-action">
+                <button id="runBtn" class="btn btn-primary">
+                    <ion-icon name="play-outline"></ion-icon>
+                    Run Optimization
+                </button>
+                <div class="progress-wrap" id="progressWrap">
+                    <div class="progress-bar"></div>
+                </div>
             </div>
         </aside>
 
-        <!-- Main Workspace -->
+        <!-- ─── WORKSPACE ─── -->
         <main class="workspace">
-            <!-- Payload Component Table -->
-            <section class="components-panel glass-panel">
-                <div class="panel-header">
-                    <h2>Flight Components Database</h2>
-                    <button id="addCompBtn" class="secondary-btn">
-                        <ion-icon name="add-outline"></ion-icon> Add Part
-                    </button>
+
+            <div class="workspace-header">
+                <h2><ion-icon name="hardware-chip-outline"></ion-icon> Component Database</h2>
+                <button id="addCompBtn" class="btn btn-ghost">
+                    <ion-icon name="add-outline"></ion-icon> Add Component
+                </button>
+            </div>
+
+            <div class="tab-bar">
+                <div class="tab-item active" data-tab="components">
+                    <ion-icon name="list-outline"></ion-icon>
+                    Components <span class="count" id="compCount">7</span>
                 </div>
-                <div class="table-container">
+                <div class="tab-item" data-tab="results" id="resultsTab" style="display:none;">
+                    <ion-icon name="analytics-outline"></ion-icon>
+                    Results
+                </div>
+            </div>
+
+            <!-- Tab: Components -->
+            <div class="workspace-body" id="componentsPanel">
+                <div class="table-wrap">
                     <table id="componentsTable">
                         <thead>
                             <tr>
-                                <th>Name / ID</th>
+                                <th>Component ID</th>
                                 <th>Weight (kg)</th>
-                                <th>Size W/H/D (cm)</th>
-                                <th>Constraint Region</th>
-                                <th>Locked/Vib/Temp</th>
-                                <th>Actions</th>
+                                <th>Size X / Y / Z (cm)</th>
+                                <th>Region</th>
+                                <th>Constraints</th>
+                                <th></th>
                             </tr>
                         </thead>
-                        <tbody id="componentsBody">
-                            <!-- Populated via script.js -->
-                        </tbody>
+                        <tbody id="componentsBody"></tbody>
                     </table>
                 </div>
-            </section>
+            </div>
 
             <!-- Results Panel -->
-            <section class="results-panel glass-panel" id="resultsArea" style="display: none;">
-                <div class="panel-header">
-                    <h2>Optimization Results</h2>
-                    <div class="status-badge success">Optimal Solution Found</div>
+            <section class="results-panel" id="resultsArea">
+                <div class="results-header">
+                    <h3>
+                        <ion-icon name="checkmark-circle-outline" style="color:var(--success)"></ion-icon>
+                        Optimization Complete
+                    </h3>
+                    <span class="badge badge-success" id="statusBadge">Optimal Solution Found</span>
                 </div>
-                
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-title">Best Fitness Score</div>
-                        <div class="metric-value" id="resFitness">-</div>
-                        <div class="metric-subtitle">Lower is better</div>
+
+                <div class="metrics-strip">
+                    <div class="metric-cell">
+                        <span class="metric-label">Fitness Score</span>
+                        <span class="metric-val success" id="resFitness">—</span>
+                        <span class="metric-hint">Lower is better</span>
                     </div>
-                    <div class="metric-card">
-                        <div class="metric-title">Final CG (X, Y, Z)</div>
-                        <div class="metric-value" id="resCG">-</div>
-                        <div class="metric-subtitle">Must be inside target envelope</div>
+                    <div class="metric-cell">
+                        <span class="metric-label">Center of Gravity</span>
+                        <span class="metric-val accent" id="resCG">—</span>
+                        <span class="metric-hint">Must be inside target envelope</span>
                     </div>
-                    <div class="metric-card">
-                        <div class="metric-title">Algorithm</div>
-                        <div class="metric-value accent" id="resAlgo">-</div>
-                        <div class="metric-subtitle">Evaluated Successfully</div>
+                    <div class="metric-cell">
+                        <span class="metric-label">Algorithm</span>
+                        <span class="metric-val purple" id="resAlgo">—</span>
+                        <span class="metric-hint">Converged successfully</span>
                     </div>
                 </div>
 
-                <div class="geometry-view">
-                    <h3>Spatial Placement Log</h3>
-                    <div class="scroll-log" id="resultLog">
-                        <!-- Code lines -->
-                    </div>
-                </div>
+                <div class="log-area" id="resultLog"></div>
             </section>
 
         </main>
     </div>
+</div>
 
-    <!-- Template for Table Row -->
-    <template id="compRowTemplate">
-        <tr>
-            <td><input type="text" class="c-id" value=""></td>
-            <td><input type="number" class="c-weight" step="0.1"></td>
-            <td>
-                <div class="dim-inputs">
-                    <input type="number" class="c-dx" placeholder="X"><input type="number" class="c-dy" placeholder="Y"><input type="number" class="c-dz" placeholder="Z">
-                </div>
-            </td>
-            <td>
-                <select class="c-region">
-                    <option value="BURUN">Burun (Nose)</option>
-                    <option value="GOVDE">Govde (Body)</option>
-                    <option value="KUYRUK">Kuyruk (Tail)</option>
-                    <option value="TAVAN">Tavan (Ceiling)</option>
-                    <option value="TABAN">Taban (Floor)</option>
-                </select>
-            </td>
-            <td>
-                <label class="check-container">L<input type="checkbox" class="c-locked"></label>
-                <label class="check-container">V<input type="checkbox" class="c-vib"></label>
-                <label class="check-container">T<input type="checkbox" class="c-temp"></label>
-            </td>
-            <td>
-                <button class="icon-btn del-btn"><ion-icon name="trash-outline"></ion-icon></button>
-            </td>
-        </tr>
-    </template>
+<!-- Row Template -->
+<template id="compRowTemplate">
+    <tr>
+        <td><input type="text" class="c-id" value=""></td>
+        <td><input type="number" class="c-weight" step="0.1"></td>
+        <td>
+            <div class="dim-inputs">
+                <input type="number" class="c-dx" placeholder="X">
+                <input type="number" class="c-dy" placeholder="Y">
+                <input type="number" class="c-dz" placeholder="Z">
+            </div>
+        </td>
+        <td>
+            <select class="c-region">
+                <option value="BURUN">🔴 Burun (Nose)</option>
+                <option value="GOVDE">🔵 Gövde (Body)</option>
+                <option value="KUYRUK">🟣 Kuyruk (Tail)</option>
+                <option value="TAVAN">🟢 Tavan (Ceiling)</option>
+                <option value="TABAN">🟠 Taban (Floor)</option>
+            </select>
+        </td>
+        <td>
+            <div class="toggle-group">
+                <label class="toggle-label" data-tooltip="Locked Position">
+                    <input type="checkbox" class="c-locked"> 🔒
+                </label>
+                <label class="toggle-label" data-tooltip="Vibration Sensitive">
+                    <input type="checkbox" class="c-vib"> 📳
+                </label>
+                <label class="toggle-label" data-tooltip="Temperature Sensitive">
+                    <input type="checkbox" class="c-temp"> 🌡️
+                </label>
+            </div>
+        </td>
+        <td>
+            <button class="btn-icon del-btn" data-tooltip="Remove"><ion-icon name="trash-outline"></ion-icon></button>
+        </td>
+    </tr>
+</template>
 
-    <script src="script.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
