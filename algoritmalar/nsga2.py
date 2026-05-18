@@ -130,11 +130,11 @@ def run_nsga2(pop_size, generations, aircraft):
     best_front = fronts[0]
     
     # NSGA-II'de en iyi tek bir çözüm yoktur, Pareto Front vardır.
-    # Uyumlu olması için öncelikle "Ceza Puanı" en düşük, sonra CG hatası en düşük olanı seçiyoruz.
-    best_front.sort(key=lambda x: (x.obj1, x.obj2))
-    best_ind = best_front[0]
-    
+    # GA fitness skoru (ceza + CG cezası + ödüller bileşkesi) en yüksek olanı seçiyoruz;
+    # böylece analiz ve görselleştirme ile tutarlı bir tasarım dönmüş oluyor.
+    best_ind = max(best_front, key=lambda x: x.score)
+
     print(f"\nNSGA-II Tamamlandı. Pareto Front (Rank 1) Çözüm Sayısı: {len(best_front)}")
-    print(f"Seçilen Tasarım -> Ceza: {best_ind.obj1:.0f}, CG Hatası: {best_ind.obj2:.2f}")
+    print(f"Seçilen Tasarım -> Ceza: {best_ind.obj1:.0f}, CG Hatası: {best_ind.obj2:.2f}, Skor: {best_ind.score:.0f}")
     print(f"CG Koordinatları: {best_ind.cg}")
     return best_ind, best_ind.score, best_ind.cg
