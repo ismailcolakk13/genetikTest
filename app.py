@@ -10,6 +10,7 @@ from modeller.komponent import Komponent
 from algoritmalar.ga import run_ga
 from algoritmalar.pso import run_pso
 from algoritmalar.nsga2 import run_nsga2
+from algoritmalar.nsga2_pso_hybrid import run_nsga2_pso_hybrid
 
 app = FastAPI(title="Aircraft Component Layout Optimizer")
 
@@ -83,6 +84,8 @@ async def run_simulation(req: SimulationRequest):
             en_iyi_tasarim, best_score, best_cg = run_pso(req.pop_size, req.generations, aircraft)
         elif req.algoritma == "NSGA2":
             en_iyi_tasarim, best_score, best_cg = run_nsga2(req.pop_size, req.generations, aircraft)
+        elif req.algoritma == "HYBRID_NSGA2_PSO":
+            en_iyi_tasarim, best_score, best_cg = run_nsga2_pso_hybrid(req.pop_size, req.generations, aircraft)
         elif req.algoritma == "GA":
             en_iyi_tasarim, best_score, best_cg = run_ga(req.pop_size, req.generations, aircraft)
         else:
