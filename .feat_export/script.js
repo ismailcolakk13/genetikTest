@@ -14,7 +14,7 @@ const template = document.getElementById('compRowTemplate');
 function addComponentRow(data) {
     const clone = template.content.cloneNode(true);
     const row = clone.querySelector('tr');
-
+    
     row.querySelector('.c-id').value = data.id || 'New_Part';
     row.querySelector('.c-weight').value = data.w || 10;
     row.querySelector('.c-dx').value = data.d ? data.d[0] : 10;
@@ -24,11 +24,11 @@ function addComponentRow(data) {
     row.querySelector('.c-locked').checked = data.lock || false;
     row.querySelector('.c-vib').checked = data.vib || false;
     row.querySelector('.c-temp').checked = data.temp || false;
-
+    
     row.querySelector('.del-btn').addEventListener('click', () => {
         row.remove();
     });
-
+    
     tbody.appendChild(row);
 }
 
@@ -43,12 +43,12 @@ document.getElementById('runBtn').addEventListener('click', async () => {
     const btn = document.getElementById('runBtn');
     const loading = document.getElementById('loading');
     const resultsArea = document.getElementById('resultsArea');
-
+    
     // UI Loading state
     btn.disabled = true;
     btn.innerHTML = 'Solving...';
     loading.style.display = 'block';
-
+    
     // Scrape data
     const reqData = {
         govde_uzunluk: parseFloat(document.getElementById('govde_uzunluk').value),
@@ -65,12 +65,12 @@ document.getElementById('runBtn').addEventListener('click', async () => {
         algoritma: document.getElementById('algoritma').value,
         komponentler: []
     };
-
+    
     const rows = tbody.querySelectorAll('tr');
     rows.forEach(r => {
         const id = r.querySelector('.c-id').value;
-        if (id.trim() === '') return;
-
+        if(id.trim() === '') return;
+        
         let lock = r.querySelector('.c-locked').checked;
         let cData = {
             id: id,
@@ -92,16 +92,16 @@ document.getElementById('runBtn').addEventListener('click', async () => {
         }
         reqData.komponentler.push(cData);
     });
-
+    
     try {
         const res = await fetch('http://127.0.0.1:8000/api/run-simulation', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(reqData)
         });
-
+        
         const data = await res.json();
-
+        
         if (!res.ok) {
             alert('Error: ' + JSON.stringify(data));
         } else {
@@ -109,7 +109,7 @@ document.getElementById('runBtn').addEventListener('click', async () => {
             document.getElementById('resFitness').textContent = data.en_iyi_skor.toFixed(4);
             document.getElementById('resCG').textContent = `[${data.en_iyi_cg.x}, ${data.en_iyi_cg.y}, ${data.en_iyi_cg.z}]`;
             document.getElementById('resAlgo').textContent = data.algoritma_ismi;
-
+            
             // Log components
             const logBox = document.getElementById('resultLog');
             logBox.innerHTML = '';
@@ -118,7 +118,7 @@ document.getElementById('runBtn').addEventListener('click', async () => {
                 line.textContent = `> ${k.id} placed at (${k.pos_x.toFixed(1)}, ${k.pos_y.toFixed(1)}, ${k.pos_z.toFixed(1)}) in ${k.sabit_bolge}`;
                 logBox.appendChild(line);
             });
-
+            
             resultsArea.style.display = 'flex';
             // Scroll to bottom smoothly since component pane shrinks
             resultsArea.scrollIntoView({ behavior: 'smooth' });
@@ -127,7 +127,7 @@ document.getElementById('runBtn').addEventListener('click', async () => {
         console.error(e);
         alert('Network Error! Is the backend running?');
     }
-
+    
     btn.disabled = false;
     btn.innerHTML = '<ion-icon name="play-outline"></ion-icon> Run Optimization Sequence';
     loading.style.display = 'none';

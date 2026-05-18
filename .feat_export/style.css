@@ -10,7 +10,7 @@
     --danger: #d44d5c;
     --success: #3ab285;
     --input-bg: rgba(0, 0, 0, 0.3);
-
+    
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
@@ -22,7 +22,7 @@
 
 body {
     background: var(--bg-main);
-    background-image:
+    background-image: 
         radial-gradient(circle at 15% 50%, rgba(94, 106, 210, 0.08), transparent 25%),
         radial-gradient(circle at 85% 30%, rgba(58, 178, 133, 0.05), transparent 25%);
     color: var(--text-primary);
@@ -99,8 +99,7 @@ body {
     color: var(--text-primary);
 }
 
-input,
-select {
+input, select {
     width: 100%;
     background: var(--input-bg);
     border: 1px solid var(--panel-border);
@@ -112,8 +111,7 @@ select {
     transition: all 0.2s ease;
 }
 
-input:focus,
-select:focus {
+input:focus, select:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 2px var(--accent-glow);
@@ -148,8 +146,8 @@ select:focus {
 }
 
 .secondary-btn {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
     color: var(--text-primary);
     padding: 0.5rem 1rem;
     border-radius: 8px;
@@ -162,7 +160,7 @@ select:focus {
 }
 
 .secondary-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255,255,255,0.1);
 }
 
 /* Loading Bar */
@@ -184,13 +182,8 @@ select:focus {
 }
 
 @keyframes indeterminate {
-    0% {
-        transform: translateX(-100%);
-    }
-
-    100% {
-        transform: translateX(300%);
-    }
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
 }
 
 /* Main Workspace */
@@ -231,8 +224,7 @@ table {
     border-collapse: collapse;
 }
 
-th,
-td {
+th, td {
     padding: 0.8rem;
     text-align: left;
     border-bottom: 1px solid var(--panel-border);
@@ -249,18 +241,16 @@ th {
     z-index: 10;
 }
 
-td input,
-td select {
+td input, td select {
     padding: 0.4rem;
     font-size: 0.85rem;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(0,0,0,0.2);
 }
 
 .dim-inputs {
     display: flex;
     gap: 0.2rem;
 }
-
 .dim-inputs input {
     width: 50px;
     text-align: center;
@@ -274,7 +264,6 @@ td select {
     cursor: pointer;
     transition: 0.2s;
 }
-
 .icon-btn:hover {
     color: var(--danger);
 }
@@ -287,7 +276,6 @@ td select {
     font-size: 0.8rem;
     color: var(--text-muted);
 }
-
 .check-container input {
     width: auto;
     cursor: pointer;
@@ -319,7 +307,7 @@ td select {
 }
 
 .metric-card {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(0,0,0,0.2);
     border-radius: 12px;
     padding: 1rem;
     border: 1px solid var(--panel-border);
@@ -337,10 +325,7 @@ td select {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
-
-.metric-value.accent {
-    color: var(--accent);
-}
+.metric-value.accent { color: var(--accent); }
 
 .metric-subtitle {
     font-size: 0.7rem;
@@ -353,13 +338,11 @@ td select {
     display: flex;
     flex-direction: column;
 }
-
 .geometry-view h3 {
     font-size: 0.9rem;
     margin-bottom: 0.5rem;
     color: var(--text-muted);
 }
-
 .scroll-log {
     flex: 1;
     background: #000;
@@ -377,16 +360,13 @@ td select {
     width: 6px;
     height: 6px;
 }
-
 ::-webkit-scrollbar-track {
     background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255,255,255,0.2);
     border-radius: 10px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
+    background: rgba(255,255,255,0.4);
 }
