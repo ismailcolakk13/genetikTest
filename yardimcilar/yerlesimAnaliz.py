@@ -41,13 +41,14 @@ def analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
         print(f"⛽ Yakıt tankları ideal merkeze çok yakın. Yakıt tüketiminin dengeye etkisi MİNİMUM.")
 
     # 3. Genel Skor Yorumu
-    # Ceza sistemi olduğu için skor 0'a ne kadar yakınsa (negatif değerler) o kadar iyidir.
-    if best_score > -4000:
-        print(f"🏆 Tasarım çok iyi (Skor: {best_score:.0f})")
-    elif best_score > -6000:
-        print(f"👍 Tasarım kabul edilebilir (Skor: {best_score:.0f})")
+    # Çakışma (-10000) veya Taşma (-5000) cezası yiyen bir tasarım direkt -5000'in altına düşer.
+    # Dolayısıyla -5000'den yüksek bir skor, "Fiziksel ihlal yok, sadece CG hassasiyeti aranıyor" demektir.
+    if best_score >= -2500:
+        print(f"🏆 Tasarım ÇOK İYİ (Fiziksel ihlal yok ve Denge harika) | Skor: {best_score:.0f}")
+    elif best_score >= -5000:
+        print(f"👍 Tasarım KABUL EDİLEBİLİR (Fiziksel ihlal yok, ancak denge daha iyi olabilir) | Skor: {best_score:.0f}")
     else:
-        print(f"🚫 Tasarım zayıf (Skor: {best_score:.0f})")
+        print(f"🚫 Tasarım ZAYIF (Muhtemelen parça çakışması veya gövdeden taşma var!) | Skor: {best_score:.0f}")
 
     # 4. SICAKLIK PROFİLİ ANALİZİ
     print("\n--- SICAKLIK PROFİLİ ANALİZİ ---")
