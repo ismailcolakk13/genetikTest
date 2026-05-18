@@ -10,6 +10,7 @@ from yardimcilar.yerlesimAnaliz import analiz_yap
 from algoritmalar.ga import run_ga
 from algoritmalar.pso import run_pso
 from algoritmalar.nsga2 import run_nsga2
+from algoritmalar.nsga2_pso_hybrid import run_nsga2_pso_hybrid
 from modeller.aircraft import Aircraft
 from modeller.komponent import Komponent
 
@@ -89,9 +90,10 @@ print("Lütfen çalıştırmak istediğiniz algoritmayı seçin:")
 print("1 - Genetik Algoritma (GA)")
 print("2 - Parçacık Sürüsü Optimizasyonu (PSO)")
 print("3 - NSGA-II (Çok Amaçlı Optimizasyon)")
+print("4 - Karma (Hybrid) NSGA-II + PSO")
 
 while True:
-    secim = input("Seçiminiz (1/2/3): ").strip()
+    secim = input("Seçiminiz (1/2/3/4): ").strip()
     if secim == '1':
         ALGORITMA = "GA"
         break
@@ -101,13 +103,18 @@ while True:
     elif secim == '3':
         ALGORITMA = "NSGA2"
         break
+    elif secim == '4':
+        ALGORITMA = "HYBRID_NSGA2_PSO"
+        break
     else:
-        print("Geçersiz seçim! Lütfen 1, 2 veya 3 girin.")
+        print("Geçersiz seçim! Lütfen 1, 2, 3 veya 4 girin.")
 
 if ALGORITMA == "PSO":
     en_iyi_tasarim, best_score, best_cg = run_pso(POP_SIZE, GENERATIONS, aircraft)
 elif ALGORITMA == "NSGA2":
     en_iyi_tasarim, best_score, best_cg = run_nsga2(POP_SIZE, GENERATIONS, aircraft)
+elif ALGORITMA == "HYBRID_NSGA2_PSO":
+    en_iyi_tasarim, best_score, best_cg = run_nsga2_pso_hybrid(POP_SIZE, GENERATIONS, aircraft)
 else:
     en_iyi_tasarim, best_score, best_cg = run_ga(POP_SIZE, GENERATIONS, aircraft)
 

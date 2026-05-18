@@ -87,11 +87,15 @@ def clamp_yz_fuselage(komp, x, y, z, aircraft):
 # ÇAKIŞMA KONTROLÜ
 # ---------------------------------------------------------------------------
 
-def kutular_cakisiyor_mu(pos1, dim1, pos2, dim2):
-    min1 = [pos1[0]-dim1[0]/2, pos1[1]-dim1[1]/2, pos1[2]-dim1[2]/2]
-    max1 = [pos1[0]+dim1[0]/2, pos1[1]+dim1[1]/2, pos1[2]+dim1[2]/2]
-    min2 = [pos2[0]-dim2[0]/2, pos2[1]-dim2[1]/2, pos2[2]-dim2[2]/2]
-    max2 = [pos2[0]+dim2[0]/2, pos2[1]+dim2[1]/2, pos2[2]+dim2[2]/2]
+def kutular_cakisiyor_mu(pos1, dim1, pos2, dim2, tolerance=1.5):
+    # tolerance kadar kutuların sınırlarını daraltıyoruz (esneklik payı).
+    # Örn: tolerance=1.5 ise, parçalar 1.5 cm birbirine girebilir, ceza yemez.
+    min1 = [pos1[0] - dim1[0]/2 + tolerance, pos1[1] - dim1[1]/2 + tolerance, pos1[2] - dim1[2]/2 + tolerance]
+    max1 = [pos1[0] + dim1[0]/2 - tolerance, pos1[1] + dim1[1]/2 - tolerance, pos1[2] + dim1[2]/2 - tolerance]
+    
+    min2 = [pos2[0] - dim2[0]/2 + tolerance, pos2[1] - dim2[1]/2 + tolerance, pos2[2] - dim2[2]/2 + tolerance]
+    max2 = [pos2[0] + dim2[0]/2 - tolerance, pos2[1] + dim2[1]/2 - tolerance, pos2[2] + dim2[2]/2 - tolerance]
+    
     return (
         min1[0] < max2[0] and max1[0] > min2[0] and
         min1[1] < max2[1] and max1[1] > min2[1] and
@@ -263,6 +267,50 @@ def calculate_fitness_design(birey, aircraft):
 
     puan -= (toplam_cg_hatasi / len(aircraft.doluluk_oranlari)) * 1000
 
+    # --- ÖDÜL MEKANİZMALARI ---
+    # Not: Ödüller, cezalara (ör: çakışma için -10000) kıyasla çok daha küçüktür (maks 50-150 puan). 
+    # Böylece algoritma ödül almak için bile bile çakışmaya sebep olmaz, sadece eşitler arasında en iyi dizilimi seçer.
+    
+    # Ödül 1: Kompaktlık ve Kablolama (Avionik 1 ve 2 yakınlığı)
+    pos_avi1 = birey.yerlesim.get("Aviyonik_1")
+    pos_avi2 = birey.yerlesim.get("Aviyonik_2")
+    if pos_avi1 and pos_avi2:
+        dist_avi = ((pos_avi1[0]-pos_avi2[0])**2 + (pos_avi1[1]-pos_avi2[1])**2 + (pos_avi1[2]-pos_avi2[2])**2)**0.5
+        if dist_avi < 50:
+            puan += (50 - dist_avi) * 2
+            
+    # Ödül 2: Eylemsizlik (Ağır parçaların -Batarya- uçağın merkezine yakınlığı)
+    pos_bat = birey.yerlesim.get("Batarya_Ana")
+    if pos_bat:
+        target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
+        dist_bat = ((pos_bat[0] - target_x_center)**2 + (pos_bat[1] - aircraft.target_cg_y)**2 + (pos_bat[2] - aircraft.target_cg_z)**2)**0.5
+        if dist_bat < 100:
+            puan += (100 - dist_bat) * 1.5
+            
+    # Ödül 3: Ekstra Güvenlik Marjı
+    pos_motor = birey.yerlesim.get("Motor")
+    if pos_motor:
+        for k_id, pos in birey.yerlesim.items():
+            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            if parca_db.titresim_hassasiyeti or parca_db.sicaklik_hassasiyeti:
+                mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
+                lim = max(aircraft.titresim_limiti, aircraft.sicaklik_limiti)
+                if mesafe > lim:
+                    # Sınırı aşıp uzaklaştığı için ödül (Sonsuza kaçmaması için min ile limitlendi)
+                    ekstra = mesafe - lim
+                    puan += min(ekstra, 50) * 1.0
+
+    # Ödül 4: Kusursuz Simetri (Yakıt Tankları)
+    pos_tank_sol = birey.yerlesim.get("Yakit_Tanki_Sol")
+    pos_tank_sag = birey.yerlesim.get("Yakit_Tanki_Sag")
+    if pos_tank_sol and pos_tank_sag:
+        x_diff = abs(pos_tank_sol[0] - pos_tank_sag[0])
+        y_sym = abs(pos_tank_sol[1] + pos_tank_sag[1]) # biri +, biri - olmalı, toplam 0 olmalı
+        z_diff = abs(pos_tank_sol[2] - pos_tank_sag[2])
+        total_diff = x_diff + y_sym + z_diff
+        if total_diff < 15:
+            puan += (15 - total_diff) * 10
+
     return puan, dolu_cg_coords
 
 
@@ -374,5 +422,47 @@ def calculate_fitness_nsga2(birey, aircraft):
             ceza_puani += (yakit_drift_cezasi ** 2) * 25
 
     cg_hatasi = toplam_cg_hatasi / len(aircraft.doluluk_oranlari)
+
+    # --- ÖDÜL MEKANİZMALARI ---
+    # NSGA-II'de ceza_puani minimize edildiği için, ödüller ceza_puani'ndan çıkarılır (negatif etki).
+    
+    # Ödül 1: Kompaktlık ve Kablolama (Avionik 1 ve 2 yakınlığı)
+    pos_avi1 = birey.yerlesim.get("Aviyonik_1")
+    pos_avi2 = birey.yerlesim.get("Aviyonik_2")
+    if pos_avi1 and pos_avi2:
+        dist_avi = ((pos_avi1[0]-pos_avi2[0])**2 + (pos_avi1[1]-pos_avi2[1])**2 + (pos_avi1[2]-pos_avi2[2])**2)**0.5
+        if dist_avi < 50:
+            ceza_puani -= (50 - dist_avi) * 2
+            
+    # Ödül 2: Eylemsizlik (Ağır parçaların -Batarya- uçağın merkezine yakınlığı)
+    pos_bat = birey.yerlesim.get("Batarya_Ana")
+    if pos_bat:
+        target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
+        dist_bat = ((pos_bat[0] - target_x_center)**2 + (pos_bat[1] - aircraft.target_cg_y)**2 + (pos_bat[2] - aircraft.target_cg_z)**2)**0.5
+        if dist_bat < 100:
+            ceza_puani -= (100 - dist_bat) * 1.5
+            
+    # Ödül 3: Ekstra Güvenlik Marjı
+    pos_motor = birey.yerlesim.get("Motor")
+    if pos_motor:
+        for k_id, pos in birey.yerlesim.items():
+            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            if parca_db.titresim_hassasiyeti or parca_db.sicaklik_hassasiyeti:
+                mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
+                lim = max(aircraft.titresim_limiti, aircraft.sicaklik_limiti)
+                if mesafe > lim:
+                    ekstra = mesafe - lim
+                    ceza_puani -= min(ekstra, 50) * 1.0
+
+    # Ödül 4: Kusursuz Simetri (Yakıt Tankları)
+    pos_tank_sol = birey.yerlesim.get("Yakit_Tanki_Sol")
+    pos_tank_sag = birey.yerlesim.get("Yakit_Tanki_Sag")
+    if pos_tank_sol and pos_tank_sag:
+        x_diff = abs(pos_tank_sol[0] - pos_tank_sag[0])
+        y_sym = abs(pos_tank_sol[1] + pos_tank_sag[1])
+        z_diff = abs(pos_tank_sol[2] - pos_tank_sag[2])
+        total_diff = x_diff + y_sym + z_diff
+        if total_diff < 15:
+            ceza_puani -= (15 - total_diff) * 10
 
     return ceza_puani, cg_hatasi, dolu_cg_coords

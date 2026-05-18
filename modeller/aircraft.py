@@ -96,26 +96,28 @@ class Aircraft:
             ratio = (x - 180) / (self.govde_uzunluk - 180)
             return self.govde_yaricap * (1 - ratio * 0.8)
 
-    def govde_icinde_mi(self, pos, dim):
+    def govde_icinde_mi(self, pos, dim, tolerance=2.0):
         x, y, z = pos
         dx, dy, dz = dim
 
-        # 1. Boylamasına (X ekseni) kontrol
+        # 1. Boylamasına (X ekseni) kontrol - Tolerans ile
         x_min = x - dx / 2
         x_max = x + dx / 2
 
-        if x_min < 0 or x_max > self.govde_uzunluk:
+        if x_min < -tolerance or x_max > self.govde_uzunluk + tolerance:
             return False
 
         # 2. Radyal (Kesit) kontrolü
+        # Parçanın merkezden en uzak köşesinin mesafesi
         part_radial_dist = ((abs(y) + dy / 2) ** 2 + (abs(z) + dz / 2) ** 2) ** 0.5
 
-        # Kontrol noktaları: Ön, Orta, Arka
-        check_points = [x_min, x, x_max]
+        # Kontrol noktaları: Ön, Orta, Arka (X değerlerini gövde içinde kalacak şekilde sınırla)
+        check_points = [max(0.0, x_min), min(self.govde_uzunluk, x), min(self.govde_uzunluk, x_max)]
 
         for cx in check_points:
             allowed_radius = self.get_fuselage_radius(cx)
-            if part_radial_dist > allowed_radius:
+            # Tolerans (hata payı) kadar gövdenin dışına çıkmaya müsaade et
+            if part_radial_dist > (allowed_radius + tolerance):
                 return False
 
         return True
