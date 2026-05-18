@@ -169,13 +169,17 @@ def calculate_fitness_design(birey, aircraft):
     puan = 0
 
     # 1. ÇAKIŞMA KONTROLÜ
-    # Not: İki komponent de kilitli (sabit_pos) ise optimizasyon konumlarını
-    # değiştiremez; bu çiftleri ceza dışı tutuyoruz (örn. Pilot ↔ Koltuk_Pilot).
+    # Muafiyetler:
+    #  - İki komponent de kilitli (sabit_pos) ise (örn. Pilot ↔ Koltuk_Pilot).
+    #  - Kanat içi tanklar (Yakit_Tanki_*): fiziksel olarak gövdenin dışında
+    #    kanat içinde konumlanıyor; AABB kabin parçalarıyla yapay çakışıyor.
     cakisma_sayisi = 0
     keys = list(birey.yerlesim.keys())
     for i in range(len(keys)):
         for j in range(i+1, len(keys)):
             k1_id, k2_id = keys[i], keys[j]
+            if k1_id.startswith("Yakit_Tanki") or k2_id.startswith("Yakit_Tanki"):
+                continue
             k1 = next(item for item in aircraft.komponentler_db if item.id == k1_id)
             k2 = next(item for item in aircraft.komponentler_db if item.id == k2_id)
             if k1.kilitli and k2.kilitli:
@@ -186,9 +190,11 @@ def calculate_fitness_design(birey, aircraft):
                 cakisma_sayisi += 1
     puan -= cakisma_sayisi * 10000
 
-    # 2. GÖVDEDEN TAŞMA KONTROLÜ
+    # 2. GÖVDEDEN TAŞMA KONTROLÜ (kanat içi tanklar muaf)
     tasma_sayisi = 0
     for k_id, pos in birey.yerlesim.items():
+        if k_id.startswith("Yakit_Tanki"):
+            continue
         dim = next(item for item in aircraft.komponentler_db if item.id == k_id).boyut
         if not aircraft.govde_icinde_mi(pos, dim):
             tasma_sayisi += 1
@@ -256,8 +262,16 @@ def calculate_fitness_design(birey, aircraft):
         if doluluk == 1.0:
             dolu_cg_coords = (cg_x, cg_y, cg_z)
 
-        target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
-        dist_error = ((cg_x - target_x_center)**2 + (cg_y - aircraft.target_cg_y)**2 + (cg_z - aircraft.target_cg_z)**2)**0.5
+        # X için envelope: aralık içinde ceza yok, dışına çıkarsa mesafe kadar.
+        if cg_x < aircraft.target_cg_x_min:
+            cg_x_err = aircraft.target_cg_x_min - cg_x
+        elif cg_x > aircraft.target_cg_x_max:
+            cg_x_err = cg_x - aircraft.target_cg_x_max
+        else:
+            cg_x_err = 0.0
+        cg_y_err = abs(cg_y - aircraft.target_cg_y)
+        cg_z_err = abs(cg_z - aircraft.target_cg_z)
+        dist_error = (cg_x_err**2 + cg_y_err**2 + cg_z_err**2)**0.5
         toplam_cg_hatasi += dist_error
 
     # 7. YAKIT TANKI KONUM CEZASI (CG Driftini Minimize Etmek İçin)
@@ -331,12 +345,15 @@ def calculate_fitness_nsga2(birey, aircraft):
     ceza_puani = 0.0
 
     # 1. ÇAKIŞMA
-    # İki komponent de kilitli ise (Pilot ↔ Koltuk_Pilot gibi) cezadan muaf.
+    # Muafiyetler: (a) iki komponent de kilitli (Pilot ↔ Koltuk_Pilot gibi),
+    # (b) kanat içi tanklar (Yakit_Tanki_*) — gövde AABB'si dışındalar.
     cakisma_sayisi = 0
     keys = list(birey.yerlesim.keys())
     for i in range(len(keys)):
         for j in range(i+1, len(keys)):
             k1_id, k2_id = keys[i], keys[j]
+            if k1_id.startswith("Yakit_Tanki") or k2_id.startswith("Yakit_Tanki"):
+                continue
             k1 = next(item for item in aircraft.komponentler_db if item.id == k1_id)
             k2 = next(item for item in aircraft.komponentler_db if item.id == k2_id)
             if k1.kilitli and k2.kilitli:
@@ -347,9 +364,11 @@ def calculate_fitness_nsga2(birey, aircraft):
                 cakisma_sayisi += 1
     ceza_puani += cakisma_sayisi * 10000
 
-    # 2. TAŞMA
+    # 2. TAŞMA (kanat içi tanklar muaf)
     tasma_sayisi = 0
     for k_id, pos in birey.yerlesim.items():
+        if k_id.startswith("Yakit_Tanki"):
+            continue
         dim = next(item for item in aircraft.komponentler_db if item.id == k_id).boyut
         if not aircraft.govde_icinde_mi(pos, dim):
             tasma_sayisi += 1
@@ -416,8 +435,16 @@ def calculate_fitness_nsga2(birey, aircraft):
         if doluluk == 1.0:
             dolu_cg_coords = (cg_x, cg_y, cg_z)
 
-        target_x_center = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
-        dist_error = ((cg_x - target_x_center)**2 + (cg_y - aircraft.target_cg_y)**2 + (cg_z - aircraft.target_cg_z)**2)**0.5
+        # X için envelope: aralık içinde ceza yok, dışına taşma mesafesi kadar.
+        if cg_x < aircraft.target_cg_x_min:
+            cg_x_err = aircraft.target_cg_x_min - cg_x
+        elif cg_x > aircraft.target_cg_x_max:
+            cg_x_err = cg_x - aircraft.target_cg_x_max
+        else:
+            cg_x_err = 0.0
+        cg_y_err = abs(cg_y - aircraft.target_cg_y)
+        cg_z_err = abs(cg_z - aircraft.target_cg_z)
+        dist_error = (cg_x_err**2 + cg_y_err**2 + cg_z_err**2)**0.5
         toplam_cg_hatasi += dist_error
 
     # 7. YAKIT TANKI KONUM CEZASI

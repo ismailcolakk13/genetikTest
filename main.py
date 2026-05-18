@@ -24,8 +24,8 @@ print(f"\n[Pilot] Bu simülasyon için pilot kilosu: {PILOT_AGIRLIGI} kg")
 GOVDE_UZUNLUK = 300.0 #CM
 GOVDE_CAP = 60.0 #CM
 
-TARGET_CG_X_MIN = 110.0
-TARGET_CG_X_MAX = 130.0
+TARGET_CG_X_MIN = 90.0
+TARGET_CG_X_MAX = 110.0
 TARGET_CG_Y = 0.0
 TARGET_CG_Z = 0.0
 
