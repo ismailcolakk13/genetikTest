@@ -169,16 +169,20 @@ def calculate_fitness_design(birey, aircraft):
     puan = 0
 
     # 1. ÇAKIŞMA KONTROLÜ
+    # Not: İki komponent de kilitli (sabit_pos) ise optimizasyon konumlarını
+    # değiştiremez; bu çiftleri ceza dışı tutuyoruz (örn. Pilot ↔ Koltuk_Pilot).
     cakisma_sayisi = 0
     keys = list(birey.yerlesim.keys())
     for i in range(len(keys)):
         for j in range(i+1, len(keys)):
             k1_id, k2_id = keys[i], keys[j]
-            dim1 = next(item for item in aircraft.komponentler_db if item.id == k1_id).boyut
-            dim2 = next(item for item in aircraft.komponentler_db if item.id == k2_id).boyut
+            k1 = next(item for item in aircraft.komponentler_db if item.id == k1_id)
+            k2 = next(item for item in aircraft.komponentler_db if item.id == k2_id)
+            if k1.kilitli and k2.kilitli:
+                continue
             pos1 = birey.yerlesim[k1_id]
             pos2 = birey.yerlesim[k2_id]
-            if kutular_cakisiyor_mu(pos1, dim1, pos2, dim2):
+            if kutular_cakisiyor_mu(pos1, k1.boyut, pos2, k2.boyut):
                 cakisma_sayisi += 1
     puan -= cakisma_sayisi * 10000
 
@@ -327,16 +331,19 @@ def calculate_fitness_nsga2(birey, aircraft):
     ceza_puani = 0.0
 
     # 1. ÇAKIŞMA
+    # İki komponent de kilitli ise (Pilot ↔ Koltuk_Pilot gibi) cezadan muaf.
     cakisma_sayisi = 0
     keys = list(birey.yerlesim.keys())
     for i in range(len(keys)):
         for j in range(i+1, len(keys)):
             k1_id, k2_id = keys[i], keys[j]
-            dim1 = next(item for item in aircraft.komponentler_db if item.id == k1_id).boyut
-            dim2 = next(item for item in aircraft.komponentler_db if item.id == k2_id).boyut
+            k1 = next(item for item in aircraft.komponentler_db if item.id == k1_id)
+            k2 = next(item for item in aircraft.komponentler_db if item.id == k2_id)
+            if k1.kilitli and k2.kilitli:
+                continue
             pos1 = birey.yerlesim[k1_id]
             pos2 = birey.yerlesim[k2_id]
-            if kutular_cakisiyor_mu(pos1, dim1, pos2, dim2):
+            if kutular_cakisiyor_mu(pos1, k1.boyut, pos2, k2.boyut):
                 cakisma_sayisi += 1
     ceza_puani += cakisma_sayisi * 10000
 

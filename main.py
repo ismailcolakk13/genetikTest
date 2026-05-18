@@ -5,6 +5,8 @@ Created on Wed Nov  5 14:06:09 2025
 @authors: İsmail Çolak, Mehmet Can Çalışkan, Yusuf Eren Aykurt
 """
 
+import random
+
 from yardimcilar.gorsellestirici import gorsellestir_tasarim
 from yardimcilar.yerlesimAnaliz import analiz_yap
 from algoritmalar.ga import run_ga
@@ -13,6 +15,10 @@ from algoritmalar.nsga2 import run_nsga2
 from algoritmalar.nsga2_pso_hybrid import run_nsga2_pso_hybrid
 from modeller.aircraft import Aircraft
 from modeller.komponent import Komponent
+
+# Pilot kilosu her simülasyon başında bir kez rastgele belirlenir (80–100 kg).
+PILOT_AGIRLIGI = round(random.uniform(80.0, 100.0), 1)
+print(f"\n[Pilot] Bu simülasyon için pilot kilosu: {PILOT_AGIRLIGI} kg")
 
 # --- UÇAK / KULLANICI DEĞİŞKENLERİ ---  Bunlar kullanıcıdan alınmalı, geçici olarak burada tanımlı.
 GOVDE_UZUNLUK = 300.0 #CM
@@ -71,6 +77,12 @@ KOMPONENTLER_DB = [ # Bunlar kullanıcıdan alınmalı, geçici olarak burada ta
     # === KOLTUKLAR (Cessna 172: 2 ön + 2 arka) ===
     # Pilot (sol ön) → Motor arkası, kabin (sabit konum)
     Komponent(id="Koltuk_Pilot",    agirlik=8.0, boyut=(30, 15, 40),
+              izin_verilen_bolgeler=["GOVDE", "TABAN"],
+              sabit_pos=(80, -8, 0), kilitli=True,
+              titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),
+
+    # Pilot (insan yükü) → Koltuk_Pilot üstünde, ağırlığı CG'yi belirgin etkiler
+    Komponent(id="Pilot",           agirlik=PILOT_AGIRLIGI, boyut=(25, 12, 35),
               izin_verilen_bolgeler=["GOVDE", "TABAN"],
               sabit_pos=(80, -8, 0), kilitli=True,
               titresim_hassasiyeti=False, sicaklik_hassasiyeti=False),

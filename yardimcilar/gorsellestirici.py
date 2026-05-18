@@ -1459,6 +1459,223 @@ def ozel_parca_ciz(pos, dim, color, name, aircraft=None):
         for i in range(num_fins):
             fx = (x - dx*0.35) + i * (dx * 0.8 / num_fins)
             traces.append(kutu_trace(fx, y, z + dz*0.35, fin_dx*0.5, dy*0.8, dz*0.15, "silver", name + " Fin", x, y, z, r_deg, p_deg, yw_deg))
+    elif name_lower == "pilot":
+        # Oturmuş havacılık pilotu — anatomik orantılı, USAF tarzı:
+        # HGU-55/P kask + vizör + Nomex eldiven + CWU-27/P uçuş tulumu + harness.
+        # -X yönüne bakar, sırt +X tarafına yaslı, kollar öne, bacaklar 90° bükülü.
+        flight_suit  = "#4a5a2e"     # zeytin yeşili uçuş tulumu
+        suit_shadow  = "#3a4823"     # tulum gölgesi/kıvrım
+        helmet       = "#3a3f50"     # gri-mavi kask
+        helmet_dark  = "#252a3a"     # kask alt kenar şeridi
+        visor        = "#0a1428"     # koyu vizör camı
+        visor_glow   = "#1f3a5c"     # vizör yansıması
+        skin         = "#d6a574"     # ten (çene/boyun)
+        glove        = "#2e1f12"     # Nomex eldiven
+        boot         = "#0e0e0e"     # siyah deri bot
+        boot_sole    = "#1f1f1f"     # bot tabanı
+        harness      = "#5c5439"     # haki harness kayışı
+        clip_metal   = "#9a9a9a"     # metal toka
+        patch_red    = "#8a2222"     # sağ göğüs arması
+
+        # === KAFA & KASK ===
+        # Ana kask kabuğu (geriye doğru daha hacimli)
+        traces.append(elipsoit_trace(
+            x - dx*0.02, y, z + dz*0.40,
+            dx*0.44, dy*0.88, dz*0.30,
+            helmet, name + " Kask",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Kask alt kenarı (koyu şerit, kulak hizası)
+        traces.append(elipsoit_trace(
+            x - dx*0.02, y, z + dz*0.32,
+            dx*0.46, dy*0.92, dz*0.06,
+            helmet_dark, name + " Kask Kenar",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Vizör (öne kavisli, yarı silindirik)
+        traces.append(elipsoit_trace(
+            x - dx*0.20, y, z + dz*0.40,
+            dx*0.14, dy*0.72, dz*0.20,
+            visor, name + " Vizor",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Vizör alt yansıma şeridi (mavi parıltı)
+        traces.append(kutu_trace(
+            x - dx*0.25, y, z + dz*0.36,
+            dx*0.03, dy*0.55, dz*0.02,
+            visor_glow, name + " Vizor Yansima",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Çene/yüz alt kısmı (vizörün altında, kaskın dışında)
+        traces.append(elipsoit_trace(
+            x - dx*0.13, y, z + dz*0.28,
+            dx*0.16, dy*0.46, dz*0.10,
+            skin, name + " Cene",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Boyun (ten, kısa silindir görünümü)
+        traces.append(elipsoit_trace(
+            x - dx*0.03, y, z + dz*0.22,
+            dx*0.14, dy*0.34, dz*0.08,
+            skin, name + " Boyun",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Mikrofon boom (kaskdan ağız hizasına gelen çubuk)
+        traces.append(kutu_trace(
+            x - dx*0.18, y - dy*0.30, z + dz*0.32,
+            dx*0.18, dy*0.30, dz*0.02,
+            helmet_dark, name + " Mic Boom",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Mikrofon kapsülü (ağız önü topak)
+        traces.append(elipsoit_trace(
+            x - dx*0.28, y - dy*0.18, z + dz*0.30,
+            dx*0.05, dy*0.06, dz*0.05,
+            helmet_dark, name + " Mic",
+            x, y, z, r_deg, p_deg, yw_deg))
+
+        # === GÖVDE ===
+        # Üst göğüs (omuzdan göğse, geniş)
+        traces.append(kutu_trace(
+            x + dx*0.02, y, z + dz*0.16,
+            dx*0.40, dy*0.90, dz*0.20,
+            flight_suit, name + " Gogus",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Karın (biraz daha dar, gölgeli)
+        traces.append(kutu_trace(
+            x + dx*0.04, y, z + dz*0.00,
+            dx*0.38, dy*0.82, dz*0.16,
+            suit_shadow, name + " Karin",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Sırt (seat back'e yaslı, kabarık)
+        traces.append(elipsoit_trace(
+            x + dx*0.22, y, z + dz*0.10,
+            dx*0.12, dy*0.86, dz*0.38,
+            flight_suit, name + " Sirt",
+            x, y, z, r_deg, p_deg, yw_deg))
+
+        # === HARNESS (5 nokta emniyet kemeri) ===
+        # Sol & sağ omuz kayışları (omuzdan göğüs ortasına çapraz)
+        for sign in [-1, 1]:
+            traces.append(kutu_trace(
+                x - dx*0.06, y + sign*dy*0.18, z + dz*0.16,
+                dx*0.34, dy*0.06, dz*0.04,
+                harness, name + " Omuz Kayisi",
+                x, y, z, r_deg, p_deg, yw_deg))
+        # Göğüs ortasında metal toka (5 nokta birleşim)
+        traces.append(kutu_trace(
+            x - dx*0.20, y, z + dz*0.06,
+            dx*0.07, dy*0.18, dz*0.08,
+            clip_metal, name + " Toka",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Bel kayışı (yatay, kalça hizası üstü)
+        traces.append(kutu_trace(
+            x + dx*0.04, y, z - dz*0.08,
+            dx*0.40, dy*0.92, dz*0.04,
+            harness, name + " Bel Kayisi",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Sağ göğüs arması (kırmızı yama)
+        traces.append(kutu_trace(
+            x - dx*0.18, y + dy*0.32, z + dz*0.20,
+            dx*0.03, dy*0.14, dz*0.08,
+            patch_red, name + " Arma",
+            x, y, z, r_deg, p_deg, yw_deg))
+        # Pilot kanat rozeti (sol göğüs, küçük metal)
+        traces.append(kutu_trace(
+            x - dx*0.18, y - dy*0.32, z + dz*0.22,
+            dx*0.02, dy*0.14, dz*0.04,
+            clip_metal, name + " Kanat Rozet",
+            x, y, z, r_deg, p_deg, yw_deg))
+
+        # === KOLLAR (her iki taraf, eklemli) ===
+        for sign in [-1, 1]:
+            # Deltoid (omuz topu)
+            traces.append(elipsoit_trace(
+                x + dx*0.00, y + sign*dy*0.48, z + dz*0.24,
+                dx*0.24, dy*0.22, dz*0.20,
+                flight_suit, name + " Deltoid",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Üst kol / biceps (omuzdan dirseğe, dik aşağı, hafif öne)
+            traces.append(elipsoit_trace(
+                x - dx*0.03, y + sign*dy*0.46, z + dz*0.06,
+                dx*0.18, dy*0.18, dz*0.24,
+                flight_suit, name + " Biceps",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Dirsek eklemi (gölge)
+            traces.append(elipsoit_trace(
+                x - dx*0.10, y + sign*dy*0.42, z - dz*0.05,
+                dx*0.10, dy*0.16, dz*0.10,
+                suit_shadow, name + " Dirsek",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Önkol (dirsekten bileğe — öne uzanmış)
+            traces.append(elipsoit_trace(
+                x - dx*0.24, y + sign*dy*0.38, z - dz*0.06,
+                dx*0.30, dy*0.15, dz*0.15,
+                flight_suit, name + " On Kol",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Bilek (gölge bant)
+            traces.append(elipsoit_trace(
+                x - dx*0.38, y + sign*dy*0.34, z - dz*0.08,
+                dx*0.05, dy*0.12, dz*0.12,
+                suit_shadow, name + " Bilek",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Eldiven / yumruk (kumandayı kavramış)
+            traces.append(elipsoit_trace(
+                x - dx*0.44, y + sign*dy*0.32, z - dz*0.10,
+                dx*0.10, dy*0.14, dz*0.16,
+                glove, name + " Eldiven",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Başparmak (eldiven üstünde küçük çıkıntı)
+            traces.append(elipsoit_trace(
+                x - dx*0.46, y + sign*dy*0.24, z - dz*0.06,
+                dx*0.04, dy*0.06, dz*0.06,
+                glove, name + " Basparmak",
+                x, y, z, r_deg, p_deg, yw_deg))
+
+        # === KALÇA & BACAKLAR (her iki taraf) ===
+        # Kalça (gövdenin altı, oturma hizası)
+        traces.append(kutu_trace(
+            x + dx*0.04, y, z - dz*0.16,
+            dx*0.42, dy*0.88, dz*0.12,
+            suit_shadow, name + " Kalca",
+            x, y, z, r_deg, p_deg, yw_deg))
+
+        for sign in [-1, 1]:
+            # Üst bacak (kalçadan dize — yatay öne)
+            traces.append(elipsoit_trace(
+                x - dx*0.18, y + sign*dy*0.25, z - dz*0.22,
+                dx*0.48, dy*0.28, dz*0.18,
+                flight_suit, name + " Ust Bacak",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Diz (eklem topu)
+            traces.append(elipsoit_trace(
+                x - dx*0.42, y + sign*dy*0.25, z - dz*0.26,
+                dx*0.12, dy*0.22, dz*0.16,
+                suit_shadow, name + " Diz",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Alt bacak (dizden ayak bileğine — dikey aşağı, hafif öne)
+            traces.append(elipsoit_trace(
+                x - dx*0.44, y + sign*dy*0.25, z - dz*0.40,
+                dx*0.14, dy*0.20, dz*0.28,
+                flight_suit, name + " Alt Bacak",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Ayak bileği (gölge halka)
+            traces.append(elipsoit_trace(
+                x - dx*0.46, y + sign*dy*0.25, z - dz*0.50,
+                dx*0.06, dy*0.20, dz*0.06,
+                boot, name + " Ayak Bilegi",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Bot gövdesi
+            traces.append(kutu_trace(
+                x - dx*0.48, y + sign*dy*0.25, z - dz*0.53,
+                dx*0.18, dy*0.22, dz*0.08,
+                boot, name + " Bot",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Bot burnu (öne çıkıntı)
+            traces.append(elipsoit_trace(
+                x - dx*0.55, y + sign*dy*0.25, z - dz*0.54,
+                dx*0.10, dy*0.20, dz*0.07,
+                boot, name + " Bot Burun",
+                x, y, z, r_deg, p_deg, yw_deg))
+            # Bot tabanı (en altta düz şerit)
+            traces.append(kutu_trace(
+                x - dx*0.50, y + sign*dy*0.25, z - dz*0.58,
+                dx*0.24, dy*0.24, dz*0.03,
+                boot_sole, name + " Bot Taban",
+                x, y, z, r_deg, p_deg, yw_deg))
     elif "koltuk" in name_lower or "seat" in name_lower:
         # Pilot/yolcu koltuğu: minder + sırtlık + başlık + kolçaklar + ayak
         # Pilot -X yönüne (uçağın burnuna) bakar; sırtlık arkada (büyük X tarafında)
