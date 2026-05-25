@@ -74,7 +74,9 @@ def run_ga(pop_size, generations, aircraft):
             parent1 = random.choice(puanli_pop[:30])[1]
             parent2 = random.choice(puanli_pop[:30])[1]
             child = crossover_design(parent1, parent2, aircraft)
-            child = mutate_design(child, aircraft)
+            # Adaptif mutasyon: erken nesillerde yüksek keşif (0.3), geç nesillerde hassas iyileştirme (0.1)
+            adaptive_rate = 0.3 - 0.2 * (gen / max(1, generations - 1))
+            child = mutate_design(child, aircraft, rate=adaptive_rate)
             yeni_pop.append(child)
 
         populasyon = yeni_pop
