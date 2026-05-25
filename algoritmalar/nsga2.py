@@ -1,6 +1,6 @@
 import random
 import math
-from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_nsga2, calculate_fitness_design
+from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_nsga2
 from algoritmalar.ga import crossover_design, mutate_design
 
 def fast_non_dominated_sort(P):
@@ -91,12 +91,12 @@ def run_nsga2(pop_size, generations, aircraft):
     for _ in range(pop_size):
         b = TasarimBireyi()
         b.rastgele_yerlestir(aircraft)
-        # Çoklu hedefleri hesapla
-        obj1, obj2, cg = calculate_fitness_nsga2(b, aircraft)
+        # Çoklu hedefleri hesapla (score da aynı fonksiyondan döner)
+        obj1, obj2, cg, score = calculate_fitness_nsga2(b, aircraft)
         b.obj1 = obj1 # Ceza Puanı
         b.obj2 = obj2 # CG Hatası
         b.cg = cg
-        b.score = calculate_fitness_design(b, aircraft)[0] # Görselleştirici ile uyum için genel skor
+        b.score = score
         populasyon.append(b)
 
     for gen in range(generations):
@@ -117,11 +117,11 @@ def run_nsga2(pop_size, generations, aircraft):
         children = make_new_pop(parents, aircraft, pop_size)
         
         for c in children:
-            obj1, obj2, cg = calculate_fitness_nsga2(c, aircraft)
+            obj1, obj2, cg, score = calculate_fitness_nsga2(c, aircraft)
             c.obj1 = obj1
             c.obj2 = obj2
             c.cg = cg
-            c.score = calculate_fitness_design(c, aircraft)[0]
+            c.score = score
             
         populasyon = parents + children
     
@@ -129,10 +129,20 @@ def run_nsga2(pop_size, generations, aircraft):
     fronts = fast_non_dominated_sort(populasyon)
     best_front = fronts[0]
     
-    # NSGA-II'de en iyi tek bir çözüm yoktur, Pareto Front vardır.
-    # GA fitness skoru (ceza + CG cezası + ödüller bileşkesi) en yüksek olanı seçiyoruz;
-    # böylece analiz ve görselleştirme ile tutarlı bir tasarım dönmüş oluyor.
-    best_ind = max(best_front, key=lambda x: x.score)
+    # Pareto Front'tan en iyi çözümü seç
+    # Önce fiziksel ihlali düşük olanları filtrele (taşma=5000, çakışma=10000)
+    low_penalty = [p for p in best_front if p.obj1 < 5000]
+    selection_pool = low_penalty if low_penalty else best_front
+    
+    # Normalize edilmiş ideal noktaya en yakın çözümü seç
+    ideal_obj1 = min(p.obj1 for p in selection_pool)
+    ideal_obj2 = min(p.obj2 for p in selection_pool)
+    range1 = max(p.obj1 for p in selection_pool) - ideal_obj1
+    range2 = max(p.obj2 for p in selection_pool) - ideal_obj2
+    if range1 == 0: range1 = 1.0
+    if range2 == 0: range2 = 1.0
+    best_ind = min(selection_pool, key=lambda p:
+        ((p.obj1 - ideal_obj1) / range1)**2 + ((p.obj2 - ideal_obj2) / range2)**2)
 
     print(f"\nNSGA-II Tamamlandı. Pareto Front (Rank 1) Çözüm Sayısı: {len(best_front)}")
     print(f"Seçilen Tasarım -> Ceza: {best_ind.obj1:.0f}, CG Hatası: {best_ind.obj2:.2f}, Skor: {best_ind.score:.0f}")

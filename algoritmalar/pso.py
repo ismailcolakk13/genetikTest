@@ -39,11 +39,34 @@ def run_pso(pop_size, generations, aircraft):
             global_best_cg = cg
             global_best_birey = copy.deepcopy(p)
 
-    w = 0.7
     c1 = 1.5
     c2 = 1.5
 
     for gen in range(generations):
+        # Adaptif atalet katsayısı: erken keşif (0.9) → geç sömürü (0.4)
+        w = 0.9 - 0.5 * (gen / max(1, generations - 1))
+
+        # Sıkışma tespiti: global_best skoru hâlâ çok kötüyse (fiziksel ihlal var)
+        # Skor -5000'den düşükse muhtemelen çakışma/taşma var
+        stuck = global_best_score < -5500
+
+        # Sıkışma durumunda: sürünün en kötü %30'unu sıfırdan rastgele başlat
+        if stuck and gen > 0 and gen % 5 == 0:
+            swarm.sort(key=lambda x: x.best_score, reverse=True)
+            reset_count = max(1, pop_size // 3)
+            for i in range(pop_size - reset_count, pop_size):
+                fresh = PsoParticle()
+                fresh.rastgele_yerlestir(aircraft)
+                score, cg = calculate_fitness_design(fresh, aircraft)
+                fresh.best_score = score
+                fresh.best_cg = cg
+                swarm[i] = fresh
+                if score > global_best_score:
+                    global_best_score = score
+                    global_best_yerlesim = copy.deepcopy(fresh.yerlesim)
+                    global_best_cg = cg
+                    global_best_birey = copy.deepcopy(fresh)
+
         for p in swarm:
             for k_id in list(p.yerlesim.keys()):
                 comp_info = next((item for item in aircraft.komponentler_db if item.id == k_id), None)

@@ -178,7 +178,11 @@ def calculate_fitness_design(birey, aircraft):
     for i in range(len(keys)):
         for j in range(i+1, len(keys)):
             k1_id, k2_id = keys[i], keys[j]
-            if k1_id.startswith("Yakit_Tanki") or k2_id.startswith("Yakit_Tanki"):
+            # Kanat tankı ↔ gövde parçası: farklı hacimde → yapay çakışma, atla
+            # Ancak iki yakıt tankı birbiriyle çakışıyorsa kontrol et
+            is_tank1 = k1_id.startswith("Yakit_Tanki")
+            is_tank2 = k2_id.startswith("Yakit_Tanki")
+            if is_tank1 != is_tank2:
                 continue
             k1 = next(item for item in aircraft.komponentler_db if item.id == k1_id)
             k2 = next(item for item in aircraft.komponentler_db if item.id == k2_id)
@@ -352,7 +356,11 @@ def calculate_fitness_nsga2(birey, aircraft):
     for i in range(len(keys)):
         for j in range(i+1, len(keys)):
             k1_id, k2_id = keys[i], keys[j]
-            if k1_id.startswith("Yakit_Tanki") or k2_id.startswith("Yakit_Tanki"):
+            # Kanat tankı ↔ gövde parçası: farklı hacimde → yapay çakışma, atla
+            # Ancak iki yakıt tankı birbiriyle çakışıyorsa kontrol et
+            is_tank1 = k1_id.startswith("Yakit_Tanki")
+            is_tank2 = k2_id.startswith("Yakit_Tanki")
+            if is_tank1 != is_tank2:
                 continue
             k1 = next(item for item in aircraft.komponentler_db if item.id == k1_id)
             k2 = next(item for item in aircraft.komponentler_db if item.id == k2_id)
@@ -499,4 +507,7 @@ def calculate_fitness_nsga2(birey, aircraft):
         if total_diff < 15:
             ceza_puani -= (15 - total_diff) * 10
 
-    return ceza_puani, cg_hatasi, dolu_cg_coords
+    # Tek-amaçlı skor (GA fitness ile eşdeğer): score = -(ceza) - cg*1000
+    score = -ceza_puani - cg_hatasi * 1000
+
+    return ceza_puani, cg_hatasi, dolu_cg_coords, score
