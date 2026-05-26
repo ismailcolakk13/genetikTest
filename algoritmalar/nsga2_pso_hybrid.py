@@ -14,9 +14,10 @@ class HybridParticle(TasarimBireyi):
         
     def rastgele_yerlestir(self, aircraft):
         super().rastgele_yerlestir(aircraft)
-        for k_id in self.yerlesim:
-            self.hiz[k_id] = (0.0, 0.0, 0.0)
-        self.pbest_yerlesim = copy.deepcopy(self.yerlesim)
+        for comp_id in self.yerlesim:
+            self.hiz[comp_id] = (0.0, 0.0, 0.0)
+        # Shallow copy is sufficient: yerlesim values are immutable tuples
+        self.pbest_yerlesim = dict(self.yerlesim)
 
 
 def _domine_eder(a_obj1, a_obj2, b_obj1, b_obj2):
@@ -128,15 +129,15 @@ def run_nsga2_pso_hybrid(pop_size, generations, aircraft):
             gbest_yerlesim = leader1.yerlesim if leader1.score > leader2.score else leader2.yerlesim
                 
             # Parçacığın bileşenleri için Hız ve Pozisyon Güncelleme
-            for k_id in list(p.yerlesim.keys()):
-                comp_info = next((item for item in aircraft.komponentler_db if item.id == k_id), None)
+            for comp_id in list(p.yerlesim.keys()):
+                comp_info = aircraft.komponentler_map.get(comp_id)
                 if comp_info and comp_info.kilitli:
                     continue
                     
-                x, y, z = p.yerlesim[k_id]
-                vx, vy, vz = p.hiz[k_id]
-                pbx, pby, pbz = p.pbest_yerlesim[k_id]
-                gbx, gby, gbz = gbest_yerlesim[k_id]
+                x, y, z = p.yerlesim[comp_id]
+                vx, vy, vz = p.hiz[comp_id]
+                pbx, pby, pbz = p.pbest_yerlesim[comp_id]
+                gbx, gby, gbz = gbest_yerlesim[comp_id]
                 
                 r1, r2 = random.random(), random.random()
                 
@@ -149,7 +150,7 @@ def run_nsga2_pso_hybrid(pop_size, generations, aircraft):
                 new_vy = max(-max_v, min(max_v, new_vy))
                 new_vz = max(-max_v, min(max_v, new_vz))
                 
-                p.hiz[k_id] = (new_vx, new_vy, new_vz)
+                p.hiz[comp_id] = (new_vx, new_vy, new_vz)
                 
                 new_x = x + new_vx
                 new_y = y + new_vy
@@ -158,7 +159,7 @@ def run_nsga2_pso_hybrid(pop_size, generations, aircraft):
                 new_x, new_z = clamp_xz_bolge(comp_info, new_x, new_z, aircraft)
                 new_y, new_z = clamp_yz_fuselage(comp_info, new_x, new_y, new_z, aircraft)
                 
-                p.yerlesim[k_id] = (new_x, new_y, new_z)
+                p.yerlesim[comp_id] = (new_x, new_y, new_z)
                 
             # 4. GA Mutasyon Desteği (sıkışınca %30, normal %15)
             mutation_chance = 0.30 if stuck else 0.15
@@ -177,13 +178,13 @@ def run_nsga2_pso_hybrid(pop_size, generations, aircraft):
             if _domine_eder(p.obj1, p.obj2, p.pbest_obj1, p.pbest_obj2):
                 p.pbest_obj1 = p.obj1
                 p.pbest_obj2 = p.obj2
-                p.pbest_yerlesim = copy.deepcopy(p.yerlesim)
+                p.pbest_yerlesim = dict(p.yerlesim)  # shallow copy: tuples are immutable
             elif not _domine_eder(p.pbest_obj1, p.pbest_obj2, p.obj1, p.obj2):
                 # Birbirini domine edemiyor → rastgele karar
                 if random.random() < 0.5:
                     p.pbest_obj1 = p.obj1
                     p.pbest_obj2 = p.obj2
-                    p.pbest_yerlesim = copy.deepcopy(p.yerlesim)
+                    p.pbest_yerlesim = dict(p.yerlesim)  # shallow copy: tuples are immutable
             
             # 7. Global arşivi güncelle
             _arsive_ekle(archive, p)
@@ -206,7 +207,7 @@ def run_nsga2_pso_hybrid(pop_size, generations, aircraft):
             child.yerlesim = temp.yerlesim
             for k_id in child.yerlesim:
                 child.hiz[k_id] = (random.uniform(-2, 2), random.uniform(-2, 2), random.uniform(-2, 2))
-            child.pbest_yerlesim = copy.deepcopy(child.yerlesim)
+            child.pbest_yerlesim = dict(child.yerlesim)  # shallow copy: tuples are immutable
             
             obj1, obj2, cg, score = calculate_fitness_nsga2(child, aircraft)
             child.obj1 = obj1

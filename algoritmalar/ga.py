@@ -3,8 +3,8 @@ from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_de
 
 def crossover_design(parent1, parent2, aircraft):
     child = TasarimBireyi()
-    for k_id in aircraft.komponentler_db:
-        key = k_id.id
+    for komp in aircraft.komponentler_db:
+        key = komp.id  # named `komp` (a Komponent object) to distinguish from string IDs
         if random.random() < 0.5:
             child.yerlesim[key] = parent1.yerlesim[key]
         else:
@@ -12,12 +12,13 @@ def crossover_design(parent1, parent2, aircraft):
     return child
 
 def mutate_design(birey, aircraft, rate=0.1):
-    for k_id in birey.yerlesim:
-        comp_info = next((item for item in aircraft.komponentler_db if item.id == k_id), None)
+    kmap = aircraft.komponentler_map
+    for comp_id in birey.yerlesim:
+        comp_info = kmap.get(comp_id)
         if comp_info and comp_info.kilitli:
             continue
 
-        x, y, z = birey.yerlesim[k_id]
+        x, y, z = birey.yerlesim[comp_id]
 
         if random.random() < rate:
             x += random.uniform(-10, 10)
@@ -28,7 +29,7 @@ def mutate_design(birey, aircraft, rate=0.1):
         x, z = clamp_xz_bolge(comp_info, x, z, aircraft)
         # YZ fuselage dairesel sınırına clamp
         y, z = clamp_yz_fuselage(comp_info, x, y, z, aircraft)
-        birey.yerlesim[k_id] = (x, y, z)
+        birey.yerlesim[comp_id] = (x, y, z)
     return birey
 
 def run_ga(pop_size, generations, aircraft):
@@ -41,7 +42,7 @@ def run_ga(pop_size, generations, aircraft):
 
     best_cg = (0, 0, 0)
     best_score = -float('inf')
-    en_iyi_tasarim = None
+    en_iyi_tasarim = populasyon[0] if populasyon else TasarimBireyi()
 
     for gen in range(generations):
         puanli_pop = []
@@ -53,6 +54,7 @@ def run_ga(pop_size, generations, aircraft):
 
         best_score = puanli_pop[0][0]
         best_cg = puanli_pop[0][2]
+        en_iyi_tasarim = puanli_pop[0][1]
 
         if gen % 10 == 0:
             print(f"Nesil {gen}: Puan {best_score:.0f} | CG X: {best_cg[0]:.1f} "
@@ -61,14 +63,15 @@ def run_ga(pop_size, generations, aircraft):
         yeni_pop = [x[1] for x in puanli_pop[:10]]
 
         # Elitlere de X+Z bölge clamp uygula
+        kmap = aircraft.komponentler_map
         for ind in yeni_pop:
-            for k_id in ind.yerlesim:
-                comp_info = next((item for item in aircraft.komponentler_db if item.id == k_id), None)
+            for comp_id in ind.yerlesim:
+                comp_info = kmap.get(comp_id)
                 if comp_info and not comp_info.kilitli:
-                    x, y, z = ind.yerlesim[k_id]
+                    x, y, z = ind.yerlesim[comp_id]
                     x, z = clamp_xz_bolge(comp_info, x, z, aircraft)
                     y, z = clamp_yz_fuselage(comp_info, x, y, z, aircraft)
-                    ind.yerlesim[k_id] = (x, y, z)
+                    ind.yerlesim[comp_id] = (x, y, z)
 
         while len(yeni_pop) < pop_size:
             parent1 = random.choice(puanli_pop[:30])[1]
@@ -81,5 +84,4 @@ def run_ga(pop_size, generations, aircraft):
 
         populasyon = yeni_pop
 
-    en_iyi_tasarim = puanli_pop[0][1]
     return en_iyi_tasarim, best_score, best_cg

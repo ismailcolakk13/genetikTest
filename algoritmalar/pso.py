@@ -12,9 +12,10 @@ class PsoParticle(TasarimBireyi):
 
     def rastgele_yerlestir(self, aircraft):
         super().rastgele_yerlestir(aircraft)
-        for k_id in self.yerlesim:
-            self.hiz[k_id] = (0.0, 0.0, 0.0)
-        self.best_yerlesim = copy.deepcopy(self.yerlesim)
+        for comp_id in self.yerlesim:
+            self.hiz[comp_id] = (0.0, 0.0, 0.0)
+        # Shallow copy is sufficient: yerlesim values are immutable tuples
+        self.best_yerlesim = dict(self.yerlesim)
 
 def run_pso(pop_size, generations, aircraft):
     print("PSO optimizasyonu başlıyor...")
@@ -35,12 +36,18 @@ def run_pso(pop_size, generations, aircraft):
 
         if score > global_best_score:
             global_best_score = score
-            global_best_yerlesim = copy.deepcopy(p.yerlesim)
+            global_best_yerlesim = dict(p.yerlesim)  # shallow copy: tuples are immutable
             global_best_cg = cg
-            global_best_birey = copy.deepcopy(p)
+            global_best_birey = copy.copy(p)
+
+    # Guard: nothing to optimise if the swarm is empty
+    if not swarm:
+        empty = PsoParticle()
+        return empty, global_best_score, global_best_cg
 
     c1 = 1.5
     c2 = 1.5
+    kmap = aircraft.komponentler_map
 
     for gen in range(generations):
         # Adaptif atalet katsayısı: erken keşif (0.9) → geç sömürü (0.4)
@@ -63,20 +70,20 @@ def run_pso(pop_size, generations, aircraft):
                 swarm[i] = fresh
                 if score > global_best_score:
                     global_best_score = score
-                    global_best_yerlesim = copy.deepcopy(fresh.yerlesim)
+                    global_best_yerlesim = dict(fresh.yerlesim)
                     global_best_cg = cg
-                    global_best_birey = copy.deepcopy(fresh)
+                    global_best_birey = copy.copy(fresh)
 
         for p in swarm:
-            for k_id in list(p.yerlesim.keys()):
-                comp_info = next((item for item in aircraft.komponentler_db if item.id == k_id), None)
+            for comp_id in list(p.yerlesim.keys()):
+                comp_info = kmap.get(comp_id)
                 if comp_info and comp_info.kilitli:
                     continue
 
-                x, y, z = p.yerlesim[k_id]
-                vx, vy, vz = p.hiz[k_id]
-                pbx, pby, pbz = p.best_yerlesim[k_id]
-                gbx, gby, gbz = global_best_yerlesim[k_id]
+                x, y, z = p.yerlesim[comp_id]
+                vx, vy, vz = p.hiz[comp_id]
+                pbx, pby, pbz = p.best_yerlesim[comp_id]
+                gbx, gby, gbz = global_best_yerlesim[comp_id]
 
                 r1, r2 = random.random(), random.random()
 
@@ -89,7 +96,7 @@ def run_pso(pop_size, generations, aircraft):
                 new_vy = max(-max_v, min(max_v, new_vy))
                 new_vz = max(-max_v, min(max_v, new_vz))
 
-                p.hiz[k_id] = (new_vx, new_vy, new_vz)
+                p.hiz[comp_id] = (new_vx, new_vy, new_vz)
 
                 new_x = x + new_vx
                 new_y = y + new_vy
@@ -100,22 +107,26 @@ def run_pso(pop_size, generations, aircraft):
                 # YZ fuselage dairesel sınırına clamp
                 new_y, new_z = clamp_yz_fuselage(comp_info, new_x, new_y, new_z, aircraft)
 
-                p.yerlesim[k_id] = (new_x, new_y, new_z)
+                p.yerlesim[comp_id] = (new_x, new_y, new_z)
             
             score, cg = calculate_fitness_design(p, aircraft)
             
             if score > p.best_score:
                 p.best_score = score
-                p.best_yerlesim = copy.deepcopy(p.yerlesim)
+                p.best_yerlesim = dict(p.yerlesim)  # shallow copy: tuples are immutable
                 p.best_cg = cg
                 
             if score > global_best_score:
                 global_best_score = score
-                global_best_yerlesim = copy.deepcopy(p.yerlesim)
+                global_best_yerlesim = dict(p.yerlesim)
                 global_best_cg = cg
-                global_best_birey = copy.deepcopy(p)
+                global_best_birey = copy.copy(p)
                 
         if gen % 10 == 0:
             print(f"Nesil {gen}: Puan {global_best_score:.0f} | CG X: {global_best_cg[0]:.1f} (Hedef: {aircraft.target_cg_x_min}-{aircraft.target_cg_x_max})")
-            
+
+    # Fallback: if no best was ever found (e.g. pop_size=0), return first particle
+    if global_best_birey is None:
+        global_best_birey = swarm[0] if swarm else PsoParticle()
+
     return global_best_birey, global_best_score, global_best_cg

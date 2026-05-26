@@ -167,6 +167,8 @@ class TasarimBireyi:
 
 def calculate_fitness_design(birey, aircraft):
     puan = 0
+    # O(1) component lookup via pre-built map
+    kmap = aircraft.komponentler_map
 
     # 1. ÇAKIŞMA KONTROLÜ
     # Muafiyetler:
@@ -184,8 +186,8 @@ def calculate_fitness_design(birey, aircraft):
             is_tank2 = k2_id.startswith("Yakit_Tanki")
             if is_tank1 != is_tank2:
                 continue
-            k1 = next(item for item in aircraft.komponentler_db if item.id == k1_id)
-            k2 = next(item for item in aircraft.komponentler_db if item.id == k2_id)
+            k1 = kmap[k1_id]
+            k2 = kmap[k2_id]
             if k1.kilitli and k2.kilitli:
                 continue
             pos1 = birey.yerlesim[k1_id]
@@ -199,7 +201,7 @@ def calculate_fitness_design(birey, aircraft):
     for k_id, pos in birey.yerlesim.items():
         if k_id.startswith("Yakit_Tanki"):
             continue
-        dim = next(item for item in aircraft.komponentler_db if item.id == k_id).boyut
+        dim = kmap[k_id].boyut
         if not aircraft.govde_icinde_mi(pos, dim):
             tasma_sayisi += 1
     puan -= tasma_sayisi * 5000
@@ -208,17 +210,17 @@ def calculate_fitness_design(birey, aircraft):
     pos_motor = birey.yerlesim.get("Motor")
     if pos_motor:
         for k_id, pos in birey.yerlesim.items():
-            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            parca_db = kmap[k_id]
             if parca_db.titresim_hassasiyeti:
                 mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
                 if mesafe < aircraft.titresim_limiti:
-                    ihlâl = aircraft.titresim_limiti - mesafe
-                    puan -= (ihlâl ** 2) * 50
+                    ihlal = aircraft.titresim_limiti - mesafe
+                    puan -= (ihlal ** 2) * 50
 
     # 4. SICAKLIK PROFİLİ KONTROLÜ
     if pos_motor:
         for k_id, pos in birey.yerlesim.items():
-            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            parca_db = kmap[k_id]
             if parca_db.sicaklik_hassasiyeti:
                 mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
                 if mesafe < aircraft.sicaklik_limiti:
@@ -227,7 +229,7 @@ def calculate_fitness_design(birey, aircraft):
 
     # 5. BÖLGE İHLALİ KONTROLÜ (X ve Z)
     for k_id, pos in birey.yerlesim.items():
-        parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+        parca_db = kmap[k_id]
         if parca_db.kilitli:
             continue
         x_min, x_max, z_min, z_max, _ = _secili_bolge_sinirlari(parca_db, aircraft)
@@ -250,7 +252,7 @@ def calculate_fitness_design(birey, aircraft):
         moment_x = moment_y = moment_z = 0
 
         for k_id, pos in birey.yerlesim.items():
-            db_item = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            db_item = kmap[k_id]
             mass = db_item.agirlik
             if k_id in ("Yakit_Tanki_Sol", "Yakit_Tanki_Sag"):
                 mass += aircraft.max_yakit_agirligi * doluluk * 0.5  # Her tank yarı yakıt taşır
@@ -258,6 +260,10 @@ def calculate_fitness_design(birey, aircraft):
             moment_x += mass * pos[0]
             moment_y += mass * pos[1]
             moment_z += mass * pos[2]
+
+        # Guard against degenerate zero-mass configurations
+        if total_mass == 0:
+            continue
 
         cg_x = moment_x / total_mass
         cg_y = moment_y / total_mass
@@ -287,12 +293,13 @@ def calculate_fitness_design(birey, aircraft):
             yakit_drift_cezasi = abs(yakit_pos[0] - target_x_center)
             puan -= (yakit_drift_cezasi ** 2) * 25  # iki tank, toplam ağırlık aynı
 
-    puan -= (toplam_cg_hatasi / len(aircraft.doluluk_oranlari)) * 1000
+    n_doluluk = len(aircraft.doluluk_oranlari)
+    puan -= (toplam_cg_hatasi / n_doluluk) * 1000 if n_doluluk else 0
 
     # --- ÖDÜL MEKANİZMALARI ---
-    # Not: Ödüller, cezalara (ör: çakışma için -10000) kıyasla çok daha küçüktür (maks 50-150 puan). 
+    # Not: Ödüller, cezalara (ör: çakışma için -10000) kıyasla çok daha küçüktür (maks 50-150 puan).
     # Böylece algoritma ödül almak için bile bile çakışmaya sebep olmaz, sadece eşitler arasında en iyi dizilimi seçer.
-    
+
     # Ödül 1: Kompaktlık ve Kablolama (Avionik 1 ve 2 yakınlığı)
     pos_avi1 = birey.yerlesim.get("Aviyonik_1")
     pos_avi2 = birey.yerlesim.get("Aviyonik_2")
@@ -313,7 +320,7 @@ def calculate_fitness_design(birey, aircraft):
     pos_motor = birey.yerlesim.get("Motor")
     if pos_motor:
         for k_id, pos in birey.yerlesim.items():
-            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            parca_db = kmap[k_id]
             if parca_db.titresim_hassasiyeti or parca_db.sicaklik_hassasiyeti:
                 mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
                 lim = max(aircraft.titresim_limiti, aircraft.sicaklik_limiti)
@@ -327,7 +334,7 @@ def calculate_fitness_design(birey, aircraft):
     pos_tank_sag = birey.yerlesim.get("Yakit_Tanki_Sag")
     if pos_tank_sol and pos_tank_sag:
         x_diff = abs(pos_tank_sol[0] - pos_tank_sag[0])
-        y_sym = abs(pos_tank_sol[1] + pos_tank_sag[1]) # biri +, biri - olmalı, toplam 0 olmalı
+        y_sym = abs(pos_tank_sol[1] + pos_tank_sag[1])  # biri +, biri - olmalı, toplam 0 olmalı
         z_diff = abs(pos_tank_sol[2] - pos_tank_sag[2])
         total_diff = x_diff + y_sym + z_diff
         if total_diff < 15:
@@ -347,6 +354,8 @@ def calculate_fitness_nsga2(birey, aircraft):
     2. CG Hatası  (Minimize): Ağırlık merkezinin hedeften sapması
     """
     ceza_puani = 0.0
+    # O(1) component lookup via pre-built map
+    kmap = aircraft.komponentler_map
 
     # 1. ÇAKIŞMA
     # Muafiyetler: (a) iki komponent de kilitli (Pilot ↔ Koltuk_Pilot gibi),
@@ -362,8 +371,8 @@ def calculate_fitness_nsga2(birey, aircraft):
             is_tank2 = k2_id.startswith("Yakit_Tanki")
             if is_tank1 != is_tank2:
                 continue
-            k1 = next(item for item in aircraft.komponentler_db if item.id == k1_id)
-            k2 = next(item for item in aircraft.komponentler_db if item.id == k2_id)
+            k1 = kmap[k1_id]
+            k2 = kmap[k2_id]
             if k1.kilitli and k2.kilitli:
                 continue
             pos1 = birey.yerlesim[k1_id]
@@ -377,7 +386,7 @@ def calculate_fitness_nsga2(birey, aircraft):
     for k_id, pos in birey.yerlesim.items():
         if k_id.startswith("Yakit_Tanki"):
             continue
-        dim = next(item for item in aircraft.komponentler_db if item.id == k_id).boyut
+        dim = kmap[k_id].boyut
         if not aircraft.govde_icinde_mi(pos, dim):
             tasma_sayisi += 1
     ceza_puani += tasma_sayisi * 5000
@@ -386,17 +395,17 @@ def calculate_fitness_nsga2(birey, aircraft):
     pos_motor = birey.yerlesim.get("Motor")
     if pos_motor:
         for k_id, pos in birey.yerlesim.items():
-            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            parca_db = kmap[k_id]
             if parca_db.titresim_hassasiyeti:
                 mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
                 if mesafe < aircraft.titresim_limiti:
-                    ihlâl = aircraft.titresim_limiti - mesafe
-                    ceza_puani += (ihlâl ** 2) * 50
+                    ihlal = aircraft.titresim_limiti - mesafe
+                    ceza_puani += (ihlal ** 2) * 50
 
     # 4. SICAKLIK
     if pos_motor:
         for k_id, pos in birey.yerlesim.items():
-            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            parca_db = kmap[k_id]
             if parca_db.sicaklik_hassasiyeti:
                 mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
                 if mesafe < aircraft.sicaklik_limiti:
@@ -405,7 +414,7 @@ def calculate_fitness_nsga2(birey, aircraft):
 
     # 5. BÖLGE İHLALİ (X ve Z)
     for k_id, pos in birey.yerlesim.items():
-        parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+        parca_db = kmap[k_id]
         if parca_db.kilitli:
             continue
         x_min, x_max, z_min, z_max, _ = _secili_bolge_sinirlari(parca_db, aircraft)
@@ -427,7 +436,7 @@ def calculate_fitness_nsga2(birey, aircraft):
         total_mass = 0
         moment_x = moment_y = moment_z = 0
         for k_id, pos in birey.yerlesim.items():
-            db_item = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            db_item = kmap[k_id]
             mass = db_item.agirlik
             if k_id in ("Yakit_Tanki_Sol", "Yakit_Tanki_Sag"):
                 mass += aircraft.max_yakit_agirligi * doluluk * 0.5
@@ -435,6 +444,10 @@ def calculate_fitness_nsga2(birey, aircraft):
             moment_x += mass * pos[0]
             moment_y += mass * pos[1]
             moment_z += mass * pos[2]
+
+        # Guard against degenerate zero-mass configurations
+        if total_mass == 0:
+            continue
 
         cg_x = moment_x / total_mass
         cg_y = moment_y / total_mass
@@ -463,11 +476,12 @@ def calculate_fitness_nsga2(birey, aircraft):
             yakit_drift_cezasi = abs(yakit_pos[0] - target_x_center)
             ceza_puani += (yakit_drift_cezasi ** 2) * 25
 
-    cg_hatasi = toplam_cg_hatasi / len(aircraft.doluluk_oranlari)
+    n_doluluk = len(aircraft.doluluk_oranlari)
+    cg_hatasi = (toplam_cg_hatasi / n_doluluk) if n_doluluk else 0.0
 
     # --- ÖDÜL MEKANİZMALARI ---
     # NSGA-II'de ceza_puani minimize edildiği için, ödüller ceza_puani'ndan çıkarılır (negatif etki).
-    
+
     # Ödül 1: Kompaktlık ve Kablolama (Avionik 1 ve 2 yakınlığı)
     pos_avi1 = birey.yerlesim.get("Aviyonik_1")
     pos_avi2 = birey.yerlesim.get("Aviyonik_2")
@@ -488,7 +502,7 @@ def calculate_fitness_nsga2(birey, aircraft):
     pos_motor = birey.yerlesim.get("Motor")
     if pos_motor:
         for k_id, pos in birey.yerlesim.items():
-            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            parca_db = kmap[k_id]
             if parca_db.titresim_hassasiyeti or parca_db.sicaklik_hassasiyeti:
                 mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
                 lim = max(aircraft.titresim_limiti, aircraft.sicaklik_limiti)

@@ -17,6 +17,13 @@ class Aircraft:
         self.sicaklik_limiti = sicaklik_limiti
         self.komponentler_db = komponentler_db
 
+        # O(1) component lookup — avoids repeated O(n) list scans in fitness
+        self.komponentler_map: dict = {k.id: k for k in komponentler_db}
+
+        # X position where the cylindrical mid-section transitions into the
+        # tapering tail.  Derived from fuselage length so it works for any size.
+        self._taper_start_x = govde_uzunluk * 0.6
+
         self.doluluk_oranlari = [0.0, 0.25, 0.5, 0.75, 1.0]
 
         # BÖLGE X SINIR TANIMLARI
@@ -88,12 +95,12 @@ class Aircraft:
         if x < self.bolge_burun_son:
             # Burun kısmı (Parabolik artış)
             return (x / self.bolge_burun_son) ** 0.5 * self.govde_yaricap
-        elif x < 180:
+        elif x < self._taper_start_x:
             # Orta gövde (Sabit silindir)
             return self.govde_yaricap
         else:
             # Kuyruk kısmı (Lineer incelme)
-            ratio = (x - 180) / (self.govde_uzunluk - 180)
+            ratio = (x - self._taper_start_x) / (self.govde_uzunluk - self._taper_start_x)
             return self.govde_yaricap * (1 - ratio * 0.8)
 
     def govde_icinde_mi(self, pos, dim, tolerance=2.0):

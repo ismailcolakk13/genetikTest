@@ -7,11 +7,11 @@ class Komponent:
         Birden fazla bölge verilebilir → algoritma bu bölgelerden birini seçer.
         None verilirse tüm gövde serbest kabul edilir.
     """
-    def __init__(self, id, agirlik, boyut,
+    def __init__(self, komp_id: str, agirlik: float, boyut: tuple,
                  izin_verilen_bolgeler=None,
-                 sabit_pos=None, kilitli=False,
-                 titresim_hassasiyeti=False, sicaklik_hassasiyeti=False):
-        self.id = id
+                 sabit_pos=None, kilitli: bool = False,
+                 titresim_hassasiyeti: bool = False, sicaklik_hassasiyeti: bool = False):
+        self.id = komp_id  # renamed from `id` to avoid shadowing built-in id()
         self.agirlik = agirlik
         self.boyut = boyut
         # ["BURUN"], ["GOVDE", "TABAN"], ["TAVAN"] vb.

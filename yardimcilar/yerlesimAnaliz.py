@@ -55,8 +55,9 @@ def analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
     pos_motor = en_iyi_tasarim.yerlesim.get("Motor")
     if pos_motor:
         sicaklik_ihlali_var = False
+        kmap = aircraft.komponentler_map
         for k_id, pos in en_iyi_tasarim.yerlesim.items():
-            parca_db = next(item for item in aircraft.komponentler_db if item.id == k_id)
+            parca_db = kmap[k_id]
             if parca_db.sicaklik_hassasiyeti:
                 mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
                 if mesafe < aircraft.sicaklik_limiti:
@@ -77,8 +78,9 @@ def analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
     dolu_agirlik = 0
     dolu_moment_x = 0
 
+    kmap = aircraft.komponentler_map
     for k_id, pos in en_iyi_tasarim.yerlesim.items():
-        db_item = next(item for item in aircraft.komponentler_db if item.id == k_id)
+        db_item = kmap[k_id]
         mass = db_item.agirlik
 
         # Bos depo için moment (Yakıt = 0)

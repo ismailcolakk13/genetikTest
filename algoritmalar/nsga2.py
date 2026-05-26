@@ -93,11 +93,14 @@ def run_nsga2(pop_size, generations, aircraft):
         b.rastgele_yerlestir(aircraft)
         # Çoklu hedefleri hesapla (score da aynı fonksiyondan döner)
         obj1, obj2, cg, score = calculate_fitness_nsga2(b, aircraft)
-        b.obj1 = obj1 # Ceza Puanı
-        b.obj2 = obj2 # CG Hatası
+        b.obj1 = obj1  # Ceza Puanı
+        b.obj2 = obj2  # CG Hatası
         b.cg = cg
         b.score = score
         populasyon.append(b)
+
+    # Safe defaults — returned as-is when generations=0
+    best_ind = populasyon[0] if populasyon else TasarimBireyi()
 
     for gen in range(generations):
         fronts = fast_non_dominated_sort(populasyon)

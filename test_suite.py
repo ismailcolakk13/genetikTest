@@ -1,5 +1,6 @@
 import subprocess
 import re
+import sys
 
 algorithms = {
     1: "GA",
@@ -13,11 +14,24 @@ results = {1: [], 2: [], 3: [], 4: []}
 print("Test başlıyor...")
 for algo_id, algo_name in algorithms.items():
     for i in range(10):
-        process = subprocess.Popen(['python3', 'main.py'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # Use sys.executable so the test always runs in the same Python env
+        process = subprocess.Popen(
+            [sys.executable, 'main.py'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
         stdout, stderr = process.communicate(input=f"{algo_id}\n")
-        
+
         scores = re.findall(r'Skor: ([-]?\d+)', stdout)
         statuses = re.findall(r'(KABUL EDİLEBİLİR|ZAYIF)', stdout)
+
+        if not scores:
+            # Output didn't match expected pattern — dump stderr for diagnosis
+            print(f"  [UYARI] {algo_name} Run {i+1}: Skor bilgisi bulunamadı. Stderr:\n{stderr[:500]}")
         
         score = int(scores[-1]) if scores else 0
         status = statuses[-1] if statuses else "BİLİNMİYOR"
@@ -26,8 +40,12 @@ for algo_id, algo_name in algorithms.items():
 
 print("\n--- ÖZET ---")
 for algo_id, algo_name in algorithms.items():
-    scores = [s[0] for s in results[algo_id]]
-    statuses = [s[1] for s in results[algo_id]]
+    run_data = results[algo_id]
+    if not run_data:
+        print(f"{algo_name}: Sonuç yok")
+        continue
+    scores = [s[0] for s in run_data]
+    statuses = [s[1] for s in run_data]
     avg_score = sum(scores) / len(scores)
     kabul_count = statuses.count('KABUL EDİLEBİLİR')
     zayif_count = statuses.count('ZAYIF')
