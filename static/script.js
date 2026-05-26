@@ -179,8 +179,18 @@ document.getElementById('runBtn').addEventListener('click', async () => {
             });
 
             resultsArea.style.display = 'flex';
-            // Scroll to bottom smoothly since component pane shrinks
-            resultsArea.scrollIntoView({ behavior: 'smooth' });
+
+            // 3D Viewer: iframe'i yükle
+            const viewerArea = document.getElementById('viewerArea');
+            const viewer3d = document.getElementById('viewer3d');
+            // Cache-bust ile yeniden yükle
+            viewer3d.src = '/api/get-3d-view?t=' + Date.now();
+            viewerArea.style.display = 'flex';
+
+            // 3D viewer'a smooth scroll
+            setTimeout(() => {
+                viewerArea.scrollIntoView({ behavior: 'smooth' });
+            }, 300);
         }
     } catch (e) {
         console.error(e);
@@ -190,4 +200,27 @@ document.getElementById('runBtn').addEventListener('click', async () => {
     btn.disabled = false;
     btn.innerHTML = '<ion-icon name="play-outline"></ion-icon> Run Optimization Sequence';
     loading.style.display = 'none';
+});
+
+// Fullscreen toggle for 3D viewer
+document.getElementById('openFullscreen').addEventListener('click', () => {
+    const viewerPanel = document.getElementById('viewerArea');
+    const btn = document.getElementById('openFullscreen');
+    viewerPanel.classList.toggle('fullscreen');
+    if (viewerPanel.classList.contains('fullscreen')) {
+        btn.innerHTML = '<ion-icon name="contract-outline"></ion-icon> Exit Fullscreen';
+    } else {
+        btn.innerHTML = '<ion-icon name="expand-outline"></ion-icon> Fullscreen';
+    }
+});
+
+// ESC key to exit fullscreen
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const viewerPanel = document.getElementById('viewerArea');
+        if (viewerPanel.classList.contains('fullscreen')) {
+            viewerPanel.classList.remove('fullscreen');
+            document.getElementById('openFullscreen').innerHTML = '<ion-icon name="expand-outline"></ion-icon> Fullscreen';
+        }
+    }
 });
