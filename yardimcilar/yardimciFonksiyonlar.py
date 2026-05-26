@@ -196,13 +196,15 @@ def calculate_fitness_design(birey, aircraft):
                 cakisma_sayisi += 1
     puan -= cakisma_sayisi * 10000
 
-    # 2. GÖVDEDEN TAŞMA KONTROLÜ (kanat içi tanklar muaf)
+    # 2. GÖVDEDEN TAŞMA KONTROLÜ (kanat içi tanklar ve kilitli parçalar muaf)
+    # Kilitli parçalar (Motor, koltuklar vb.) sabit konumlara yerleştirilmiş;
+    # geometrik taşmaları bilinçli bir tasarım kararıdır, optimizasyonu etkilemez.
     tasma_sayisi = 0
     for k_id, pos in birey.yerlesim.items():
-        if k_id.startswith("Yakit_Tanki"):
+        comp = kmap[k_id]
+        if k_id.startswith("Yakit_Tanki") or comp.kilitli:
             continue
-        dim = kmap[k_id].boyut
-        if not aircraft.govde_icinde_mi(pos, dim):
+        if not aircraft.govde_icinde_mi(pos, comp.boyut):
             tasma_sayisi += 1
     puan -= tasma_sayisi * 5000
 
@@ -381,13 +383,13 @@ def calculate_fitness_nsga2(birey, aircraft):
                 cakisma_sayisi += 1
     ceza_puani += cakisma_sayisi * 10000
 
-    # 2. TAŞMA (kanat içi tanklar muaf)
+    # 2. TAŞMA (kanat içi tanklar ve kilitli parçalar muaf)
     tasma_sayisi = 0
     for k_id, pos in birey.yerlesim.items():
-        if k_id.startswith("Yakit_Tanki"):
+        comp = kmap[k_id]
+        if k_id.startswith("Yakit_Tanki") or comp.kilitli:
             continue
-        dim = kmap[k_id].boyut
-        if not aircraft.govde_icinde_mi(pos, dim):
+        if not aircraft.govde_icinde_mi(pos, comp.boyut):
             tasma_sayisi += 1
     ceza_puani += tasma_sayisi * 5000
 

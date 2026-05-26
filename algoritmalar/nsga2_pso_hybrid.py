@@ -25,6 +25,22 @@ def _domine_eder(a_obj1, a_obj2, b_obj1, b_obj2):
     return (a_obj1 <= b_obj1 and a_obj2 <= b_obj2) and (a_obj1 < b_obj1 or a_obj2 < b_obj2)
 
 
+def _archive_snapshot(birey):
+    """
+    Create a lightweight archive entry — copies only the fields needed for
+    dominance comparison and final output.  Avoids deepcopy of velocity dicts
+    and pbest state which are not needed once a solution enters the archive.
+    """
+    from yardimcilar.yardimciFonksiyonlar import TasarimBireyi
+    snap = TasarimBireyi()
+    snap.yerlesim = dict(birey.yerlesim)  # shallow copy: values are immutable tuples
+    snap.obj1 = birey.obj1
+    snap.obj2 = birey.obj2
+    snap.cg = birey.cg
+    snap.score = birey.score
+    return snap
+
+
 def _arsive_ekle(archive, birey, max_archive_size=200):
     """
     Bireyi global arşive ekler (non-dominated archive).
@@ -41,7 +57,7 @@ def _arsive_ekle(archive, birey, max_archive_size=200):
     archive[:] = [a for a in archive if not _domine_eder(birey.obj1, birey.obj2, a.obj1, a.obj2)]
 
     # Ekle
-    archive.append(copy.deepcopy(birey))
+    archive.append(_archive_snapshot(birey))
 
     # Arşiv taşarsa, kalabalık mesafesi en düşük olanı çıkar
     if len(archive) > max_archive_size:

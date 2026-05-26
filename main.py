@@ -8,6 +8,7 @@ Created on Wed Nov  5 14:06:09 2025
 import os
 import random
 
+
 from yardimcilar.gorsellestirici import gorsellestir_tasarim
 from yardimcilar.yerlesimAnaliz import analiz_yap
 from algoritmalar.ga import run_ga
@@ -166,6 +167,6 @@ else:
 # Terminaldeki analizi gösteren fonksiyon    
 analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA) 
 
-# Uçağın 3D modelini gösteren fonksiyon (toplu testlerde NO_VIZ=1 ile atlanır)
-if os.environ.get("NO_VIZ") != "1":
+# Uçağın 3D modelini gösteren fonksiyon (NO_VIZ=1 ortam değişkeniyle atlanabilir)
+if not os.environ.get('NO_VIZ'):
     gorsellestir_tasarim(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA)

@@ -62,8 +62,10 @@ def calculate_crowding_distance(front):
     for i in range(1, l - 1):
         front[i].distance += (front[i+1].obj2 - front[i-1].obj2) / m_obj2
 
-def make_new_pop(pop, aircraft, pop_size):
+def make_new_pop(pop, aircraft, pop_size, gen=0, max_gen=1):
     new_pop = []
+    # Adaptif mutasyon: erken nesillerde yüksek keşif (0.3), geç nesillerde hassas iyileştirme (0.1)
+    adaptive_rate = 0.3 - 0.2 * (gen / max(1, max_gen - 1))
     while len(new_pop) < pop_size:
         # Tournament selection based on rank and crowding distance
         a = random.choice(pop)
@@ -81,7 +83,7 @@ def make_new_pop(pop, aircraft, pop_size):
             parent2 = d
             
         child = crossover_design(parent1, parent2, aircraft)
-        child = mutate_design(child, aircraft)
+        child = mutate_design(child, aircraft, rate=adaptive_rate)
         new_pop.append(child)
     return new_pop
 
@@ -117,7 +119,7 @@ def run_nsga2(pop_size, generations, aircraft):
             best_ind = parents[0] 
             print(f"Nesil {gen}: [Pareto 1. Eleman] Ceza: {best_ind.obj1:.0f}, CG Hatası: {best_ind.obj2:.2f} | CG X: {best_ind.cg[0]:.1f}")
         
-        children = make_new_pop(parents, aircraft, pop_size)
+        children = make_new_pop(parents, aircraft, pop_size, gen=gen, max_gen=generations)
         
         for c in children:
             obj1, obj2, cg, score = calculate_fitness_nsga2(c, aircraft)

@@ -39,6 +39,7 @@ def run_pso(pop_size, generations, aircraft):
             global_best_yerlesim = dict(p.yerlesim)  # shallow copy: tuples are immutable
             global_best_cg = cg
             global_best_birey = copy.copy(p)
+            global_best_birey.yerlesim = dict(p.yerlesim)  # decouple dict — copy.copy shares it
 
     # Guard: nothing to optimise if the swarm is empty
     if not swarm:
@@ -121,6 +122,7 @@ def run_pso(pop_size, generations, aircraft):
                 global_best_yerlesim = dict(p.yerlesim)
                 global_best_cg = cg
                 global_best_birey = copy.copy(p)
+                global_best_birey.yerlesim = dict(p.yerlesim)  # decouple dict — copy.copy shares it
                 
         if gen % 10 == 0:
             print(f"Nesil {gen}: Puan {global_best_score:.0f} | CG X: {global_best_cg[0]:.1f} (Hedef: {aircraft.target_cg_x_min}-{aircraft.target_cg_x_max})")

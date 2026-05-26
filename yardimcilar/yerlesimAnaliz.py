@@ -40,15 +40,48 @@ def analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
     else:
         print(f"⛽ Yakıt tankları ideal merkeze çok yakın. Yakıt tüketiminin dengeye etkisi MİNİMUM.")
 
-    # 3. Genel Skor Yorumu
-    # Çakışma (-10000) veya Taşma (-5000) cezası yiyen bir tasarım direkt -5000'in altına düşer.
-    # Dolayısıyla -5000'den yüksek bir skor, "Fiziksel ihlal yok, sadece CG hassasiyeti aranıyor" demektir.
-    if best_score >= -2500:
+    # 3. Fiziksel İhlal ve Genel Skor Yorumu
+    # Skor temelli eşik güvenilmez — CG hatası tek başına skoru -5000'in altına çekebilir.
+    # Bunun yerine çakışma ve taşmayı doğrudan re-kontrol ediyoruz.
+    from yardimcilar.yardimciFonksiyonlar import kutular_cakisiyor_mu
+    kmap_check = aircraft.komponentler_map
+    keys_check = list(en_iyi_tasarim.yerlesim.keys())
+
+    has_collision = False
+    for i in range(len(keys_check)):
+        for j in range(i + 1, len(keys_check)):
+            k1_id, k2_id = keys_check[i], keys_check[j]
+            if k1_id.startswith("Yakit_Tanki") != k2_id.startswith("Yakit_Tanki"):
+                continue
+            k1, k2 = kmap_check[k1_id], kmap_check[k2_id]
+            if k1.kilitli and k2.kilitli:
+                continue
+            if kutular_cakisiyor_mu(en_iyi_tasarim.yerlesim[k1_id], k1.boyut,
+                                     en_iyi_tasarim.yerlesim[k2_id], k2.boyut):
+                has_collision = True
+                break
+        if has_collision:
+            break
+
+    has_overflow = False
+    for k_id, pos in en_iyi_tasarim.yerlesim.items():
+        if k_id.startswith("Yakit_Tanki"):
+            continue
+        komp = kmap_check[k_id]
+        if komp.kilitli:  # sabit konumlu parçalar tasarım gereği muaf
+            continue
+        if not aircraft.govde_icinde_mi(pos, komp.boyut):
+            has_overflow = True
+            break
+
+    if has_collision:
+        print(f"🚫 Tasarım ZAYIF (Parça çakışması var!) | Skor: {best_score:.0f}")
+    elif has_overflow:
+        print(f"🚫 Tasarım ZAYIF (Gövdeden taşma var!) | Skor: {best_score:.0f}")
+    elif best_score >= -2500:
         print(f"🏆 Tasarım ÇOK İYİ (Fiziksel ihlal yok ve Denge harika) | Skor: {best_score:.0f}")
-    elif best_score >= -5000:
-        print(f"👍 Tasarım KABUL EDİLEBİLİR (Fiziksel ihlal yok, ancak denge daha iyi olabilir) | Skor: {best_score:.0f}")
     else:
-        print(f"🚫 Tasarım ZAYIF (Muhtemelen parça çakışması veya gövdeden taşma var!) | Skor: {best_score:.0f}")
+        print(f"👍 Tasarım KABUL EDİLEBİLİR (Fiziksel ihlal yok, ancak denge daha iyi olabilir) | Skor: {best_score:.0f}")
 
     # 4. SICAKLIK PROFİLİ ANALİZİ
     print("\n--- SICAKLIK PROFİLİ ANALİZİ ---")
@@ -69,6 +102,25 @@ def analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
                     print(f"✅ {k_id}: Motordan güvenli mesafede ({mesafe:.1f} cm)")
         if not sicaklik_ihlali_var:
             print("✅ Tüm ısıya hassas parçalar güvenli mesafede.")
+            
+    # 5. TİTREŞİM PROFİLİ ANALİZİ
+    print("\n--- TİTREŞİM PROFİLİ ANALİZİ ---")
+    if pos_motor:
+        titresim_ihlali_var = False
+        for k_id, pos in en_iyi_tasarim.yerlesim.items():
+            parca_db = kmap[k_id]
+            if parca_db.titresim_hassasiyeti:
+                mesafe = ((pos[0]-pos_motor[0])**2 + (pos[1]-pos_motor[1])**2 + (pos[2]-pos_motor[2])**2)**0.5
+                if mesafe < aircraft.titresim_limiti:
+                    print(f"📳 {k_id}: Motora çok yakın ({mesafe:.1f} cm) - TİTREŞİM RİSKİ! (Limit: {aircraft.titresim_limiti} cm)")
+                    titresim_ihlali_var = True
+                elif mesafe < aircraft.titresim_limiti * 1.5:
+                    print(f"⚠️ {k_id}: Motora mesafe sınırda ({mesafe:.1f} cm) - DİKKAT")
+                else:
+                    print(f"✅ {k_id}: Motordan güvenli mesafede ({mesafe:.1f} cm)")
+        if not titresim_ihlali_var:
+            print("✅ Tüm titreşime hassas parçalar güvenli mesafede.")
+
         
     print("\n--- DENGE ANALİZİ (CG DRIFT) ---")
 

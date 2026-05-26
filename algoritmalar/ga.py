@@ -1,6 +1,13 @@
 import random
 from yardimcilar.yardimciFonksiyonlar import TasarimBireyi, calculate_fitness_design, clamp_xz_bolge, clamp_yz_fuselage
 
+
+def _tournament_select(puanli_pop, k=3):
+    """Select best individual from a random sample of k candidates (tournament selection)."""
+    candidates = random.sample(puanli_pop, min(k, len(puanli_pop)))
+    return max(candidates, key=lambda x: x[0])[1]
+
+
 def crossover_design(parent1, parent2, aircraft):
     child = TasarimBireyi()
     for komp in aircraft.komponentler_db:
@@ -11,8 +18,13 @@ def crossover_design(parent1, parent2, aircraft):
             child.yerlesim[key] = parent2.yerlesim[key]
     return child
 
+
 def mutate_design(birey, aircraft, rate=0.1):
     kmap = aircraft.komponentler_map
+    # Scale the spatial step with the mutation rate:
+    # rate=0.3 (early) → ±30 cm (wide exploration)
+    # rate=0.1 (late)  → ±10 cm (fine-tuning)
+    max_delta = 100.0 * rate
     for comp_id in birey.yerlesim:
         comp_info = kmap.get(comp_id)
         if comp_info and comp_info.kilitli:
@@ -21,9 +33,9 @@ def mutate_design(birey, aircraft, rate=0.1):
         x, y, z = birey.yerlesim[comp_id]
 
         if random.random() < rate:
-            x += random.uniform(-10, 10)
-            y += random.uniform(-10, 10)
-            z += random.uniform(-10, 10)
+            x += random.uniform(-max_delta, max_delta)
+            y += random.uniform(-max_delta, max_delta)
+            z += random.uniform(-max_delta, max_delta)
 
         # X ve Z bölge sınırına clamp
         x, z = clamp_xz_bolge(comp_info, x, z, aircraft)
@@ -31,6 +43,7 @@ def mutate_design(birey, aircraft, rate=0.1):
         y, z = clamp_yz_fuselage(comp_info, x, y, z, aircraft)
         birey.yerlesim[comp_id] = (x, y, z)
     return birey
+
 
 def run_ga(pop_size, generations, aircraft):
     print("GA optimizasyonu başlıyor...")
@@ -43,6 +56,9 @@ def run_ga(pop_size, generations, aircraft):
     best_cg = (0, 0, 0)
     best_score = -float('inf')
     en_iyi_tasarim = populasyon[0] if populasyon else TasarimBireyi()
+
+    # Elite count: keep top 20% of population each generation
+    elite_count = max(2, pop_size // 5)
 
     for gen in range(generations):
         puanli_pop = []
@@ -60,7 +76,8 @@ def run_ga(pop_size, generations, aircraft):
             print(f"Nesil {gen}: Puan {best_score:.0f} | CG X: {best_cg[0]:.1f} "
                   f"(Hedef: {aircraft.target_cg_x_min}-{aircraft.target_cg_x_max})")
 
-        yeni_pop = [x[1] for x in puanli_pop[:10]]
+        # Elitizm: En iyi %20'yi koru
+        yeni_pop = [x[1] for x in puanli_pop[:elite_count]]
 
         # Elitlere de X+Z bölge clamp uygula
         kmap = aircraft.komponentler_map
@@ -73,12 +90,14 @@ def run_ga(pop_size, generations, aircraft):
                     y, z = clamp_yz_fuselage(comp_info, x, y, z, aircraft)
                     ind.yerlesim[comp_id] = (x, y, z)
 
+        # Adaptif mutasyon: erken nesillerde yüksek keşif (0.3), geç nesillerde hassas iyileştirme (0.1)
+        adaptive_rate = 0.3 - 0.2 * (gen / max(1, generations - 1))
+
         while len(yeni_pop) < pop_size:
-            parent1 = random.choice(puanli_pop[:30])[1]
-            parent2 = random.choice(puanli_pop[:30])[1]
+            # Tournament selection — better than random choice from fixed top-N
+            parent1 = _tournament_select(puanli_pop, k=3)
+            parent2 = _tournament_select(puanli_pop, k=3)
             child = crossover_design(parent1, parent2, aircraft)
-            # Adaptif mutasyon: erken nesillerde yüksek keşif (0.3), geç nesillerde hassas iyileştirme (0.1)
-            adaptive_rate = 0.3 - 0.2 * (gen / max(1, generations - 1))
             child = mutate_design(child, aircraft, rate=adaptive_rate)
             yeni_pop.append(child)
 
