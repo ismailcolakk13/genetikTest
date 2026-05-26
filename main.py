@@ -5,6 +5,7 @@ Created on Wed Nov  5 14:06:09 2025
 @authors: İsmail Çolak, Mehmet Can Çalışkan, Yusuf Eren Aykurt
 """
 
+import os
 import random
 
 from yardimcilar.gorsellestirici import gorsellestir_tasarim
@@ -165,5 +166,6 @@ else:
 # Terminaldeki analizi gösteren fonksiyon    
 analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA) 
 
-# Uçağın 3D modelini gösteren fonksiyon
-gorsellestir_tasarim(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA)
+# Uçağın 3D modelini gösteren fonksiyon (toplu testlerde NO_VIZ=1 ile atlanır)
+if os.environ.get("NO_VIZ") != "1":
+    gorsellestir_tasarim(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA)
