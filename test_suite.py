@@ -1,4 +1,6 @@
 import subprocess
+import sys
+import os
 import re
 
 algorithms = {
@@ -13,7 +15,10 @@ results = {1: [], 2: [], 3: [], 4: []}
 print("Test başlıyor...")
 for algo_id, algo_name in algorithms.items():
     for i in range(10):
-        process = subprocess.Popen(['python3', 'main.py'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['NO_VIZ'] = '1'
+        process = subprocess.Popen([sys.executable, 'main.py'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace', env=env)
         stdout, stderr = process.communicate(input=f"{algo_id}\n")
         
         scores = re.findall(r'Skor: ([-]?\d+)', stdout)
