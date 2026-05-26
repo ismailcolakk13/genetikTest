@@ -54,11 +54,18 @@ async def run_simulation(req: SimulationRequest):
         # 1. Konfigürasyonu Parse Et ve Nesnelere Çevir
         db_komponents = []
         for c in req.komponentler:
+            # sabit_bolge "GOVDE/TABAN" gibi "/" ile ayrılmış birden fazla bölge olabilir.
+            # Boş string veya "SERBEST" ise izin_verilen_bolgeler boş liste olur.
+            if c.sabit_bolge and c.sabit_bolge not in ("", "SERBEST"):
+                izin_bolgeler = [b.strip() for b in c.sabit_bolge.split("/") if b.strip()]
+            else:
+                izin_bolgeler = []
+
             komp = Komponent(
                 id=c.id,
                 agirlik=c.agirlik,
                 boyut=tuple(c.boyut),
-                izin_verilen_bolgeler=[c.sabit_bolge] if c.sabit_bolge else [],
+                izin_verilen_bolgeler=izin_bolgeler,
                 sabit_pos=tuple(c.sabit_pos) if c.sabit_pos else None,
                 kilitli=c.kilitli,
                 titresim_hassasiyeti=c.titresim_hassasiyeti,

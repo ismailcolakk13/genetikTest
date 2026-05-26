@@ -10,7 +10,6 @@
     <!-- Ionicons for some elegant icons -->
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
-    <!-- Three.js or simple CSS visualizer later, for now we will show the layout logic -->
 </head>
 
 <body class="dark-theme">
@@ -36,8 +35,8 @@
                 <div class="input-group">
                     <label>Target CG (X Min/Max)</label>
                     <div class="split-inputs">
-                        <input type="number" id="target_cg_x_min" value="110" step="1">
-                        <input type="number" id="target_cg_x_max" value="130" step="1">
+                        <input type="number" id="target_cg_x_min" value="90" step="1">
+                        <input type="number" id="target_cg_x_max" value="110" step="1">
                     </div>
                 </div>
                 <div class="input-group">
@@ -69,7 +68,7 @@
                         <option value="GA">🧬 Genetic Algorithm (GA)</option>
                         <option value="PSO">🦅 Particle Swarm Optimization (PSO)</option>
                         <option value="NSGA2">🎯 NSGA-II Multi-Objective</option>
-                        <option value="HYBRID_NSGA2_PSO">⚙️ Karma (Hybrid) NSGA-II + PSO</option>
+                        <option value="HYBRID_NSGA2_PSO" selected>⚙️ Karma (Hybrid) NSGA-II + PSO</option>
                     </select>
                 </div>
                 <div class="input-group">
@@ -108,6 +107,7 @@
                                 <th>Weight (kg)</th>
                                 <th>Size W/H/D (cm)</th>
                                 <th>Constraint Region</th>
+                                <th>Fixed Pos (X,Y,Z)</th>
                                 <th>Locked/Vib/Temp</th>
                                 <th>Actions</th>
                             </tr>
@@ -130,7 +130,7 @@
                     <div class="metric-card">
                         <div class="metric-title">Best Fitness Score</div>
                         <div class="metric-value" id="resFitness">-</div>
-                        <div class="metric-subtitle">Lower is better</div>
+                        <div class="metric-subtitle">Higher is better (negative = penalties)</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Final CG (X, Y, Z)</div>
@@ -173,7 +173,20 @@
                     <option value="KUYRUK">Kuyruk (Tail)</option>
                     <option value="TAVAN">Tavan (Ceiling)</option>
                     <option value="TABAN">Taban (Floor)</option>
+                    <option value="GOVDE/TABAN">Govde+Taban</option>
+                    <option value="GOVDE/TAVAN">Govde+Tavan</option>
+                    <option value="BURUN/TABAN">Burun+Taban</option>
+                    <option value="BURUN/TAVAN">Burun+Tavan</option>
+                    <option value="KUYRUK/TABAN">Kuyruk+Taban</option>
+                    <option value="KUYRUK/TAVAN">Kuyruk+Tavan</option>
                 </select>
+            </td>
+            <td>
+                <div class="pos-inputs" style="display:none;">
+                    <input type="number" class="c-pos-x" placeholder="X" step="0.1">
+                    <input type="number" class="c-pos-y" placeholder="Y" step="0.1">
+                    <input type="number" class="c-pos-z" placeholder="Z" step="0.1">
+                </div>
             </td>
             <td>
                 <label class="check-container">L<input type="checkbox" class="c-locked"></label>
