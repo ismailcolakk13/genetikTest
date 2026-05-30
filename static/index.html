@@ -4,15 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AeroOpt - Component Layout Optimizer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <title>AeroOpt — Component Layout Optimizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=blueprint2">
     <!-- Ionicons for some elegant icons -->
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 </head>
 
-<body class="dark-theme">
+<body class="blueprint-theme">
     <div class="app-container">
 
         <!-- Sidebar Configuration -->
@@ -20,7 +22,18 @@
             <h1 class="brand">
                 <ion-icon name="airplane-outline"></ion-icon> AeroOpt.
             </h1>
-            <p class="subtitle">Aircraft Geometry & AI Optimization Dashboard</p>
+            <p class="subtitle">Aircraft Geometry · Layout Optimization Suite</p>
+
+            <div class="form-section">
+                <h3>Preset</h3>
+                <div class="input-group">
+                    <label>Konfigürasyon</label>
+                    <select id="presetSelect">
+                        <option value="default">Varsayılan (İHA / UAV)</option>
+                        <option value="cessna172">Cessna 172 (gerçekçi)</option>
+                    </select>
+                </div>
+            </div>
 
             <div class="form-section">
                 <h3>Global Parameters</h3>
@@ -65,10 +78,10 @@
                 <div class="input-group">
                     <label>Algorithm</label>
                     <select id="algoritma">
-                        <option value="GA">🧬 Genetic Algorithm (GA)</option>
-                        <option value="PSO">🦅 Particle Swarm Optimization (PSO)</option>
-                        <option value="NSGA2">🎯 NSGA-II Multi-Objective</option>
-                        <option value="HYBRID_NSGA2_PSO" selected>⚙️ Karma (Hybrid) NSGA-II + PSO</option>
+                        <option value="GA">Genetic Algorithm (GA)</option>
+                        <option value="PSO">Particle Swarm Optimization (PSO)</option>
+                        <option value="NSGA2">NSGA-II Multi-Objective</option>
+                        <option value="HYBRID_NSGA2_PSO" selected>Hybrid NSGA-II + PSO</option>
                     </select>
                 </div>
                 <div class="input-group">
@@ -144,6 +157,13 @@
                     </div>
                 </div>
 
+                <div class="analysis-section">
+                    <h3>Engineering Analysis</h3>
+                    <div class="analysis-grid" id="analysisArea">
+                        <!-- Populated via script.js -->
+                    </div>
+                </div>
+
                 <div class="geometry-view">
                     <h3>Spatial Placement Log</h3>
                     <div class="scroll-log" id="resultLog">
@@ -212,7 +232,7 @@
         </tr>
     </template>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=blueprint2"></script>
 </body>
 
 </html>

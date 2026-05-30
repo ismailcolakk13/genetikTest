@@ -173,3 +173,153 @@ def analiz_yap(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
 
     for k_id, pos in en_iyi_tasarim.yerlesim.items():
         print(f"📍 {k_id}: Gövde Başından {pos[0]:.1f} cm geride.")
+
+
+def analiz_verisi_uret(en_iyi_tasarim, best_score, best_cg, aircraft, ALGORITMA):
+    """
+    `analiz_yap` ile aynı mühendislik analizlerini yapar; ancak terminale
+    yazmak yerine JSON'a çevrilebilir yapısal bir sözlük döndürür.
+    Web arayüzü (app.py /api/run-simulation) bu fonksiyonu kullanır.
+
+    Not: `analiz_yap` CLI ve test_suite tarafından (basılan metinlere bağlı
+    olarak) kullanıldığı için ona dokunulmadı; mantık burada ayrıca tutuluyor.
+    """
+    from yardimcilar.yardimciFonksiyonlar import kutular_cakisiyor_mu
+
+    kmap = aircraft.komponentler_map
+    yerlesim = en_iyi_tasarim.yerlesim
+
+    # --- 1. CG hedefe yakınlık ---
+    cg_x, cg_y, cg_z = best_cg
+    if cg_x < aircraft.target_cg_x_min:
+        dx = aircraft.target_cg_x_min - cg_x
+    elif cg_x > aircraft.target_cg_x_max:
+        dx = cg_x - aircraft.target_cg_x_max
+    else:
+        dx = 0.0
+    dist_error = (dx ** 2 + (cg_y - aircraft.target_cg_y) ** 2
+                  + (cg_z - aircraft.target_cg_z) ** 2) ** 0.5
+    if dist_error < 2.0:
+        cg_durum, cg_mesaj = "iyi", "CG hedefe çok yakın."
+    elif dist_error < 15.0:
+        cg_durum, cg_mesaj = "orta", "CG hedefe orta mesafede."
+    else:
+        cg_durum, cg_mesaj = "kotu", "CG hedeften uzak."
+
+    # --- 2. Yakıt tankı konumu ---
+    yakit_sol = yerlesim.get("Yakit_Tanki_Sol")
+    yakit_sag = yerlesim.get("Yakit_Tanki_Sag")
+    if yakit_sol and yakit_sag:
+        yakit_pos = ((yakit_sol[0] + yakit_sag[0]) / 2,
+                     (yakit_sol[1] + yakit_sag[1]) / 2,
+                     (yakit_sol[2] + yakit_sag[2]) / 2)
+    else:
+        yakit_pos = yerlesim.get("Yakit_Tanki", (0, 0, 0))
+    hedef_merkez_x = (aircraft.target_cg_x_min + aircraft.target_cg_x_max) / 2
+
+    # --- 3. Fiziksel ihlal (çakışma / taşma) ---
+    keys_check = list(yerlesim.keys())
+    has_collision = False
+    for i in range(len(keys_check)):
+        for j in range(i + 1, len(keys_check)):
+            k1_id, k2_id = keys_check[i], keys_check[j]
+            if k1_id.startswith("Yakit_Tanki") != k2_id.startswith("Yakit_Tanki"):
+                continue
+            k1, k2 = kmap[k1_id], kmap[k2_id]
+            if k1.kilitli and k2.kilitli:
+                continue
+            if kutular_cakisiyor_mu(yerlesim[k1_id], k1.boyut,
+                                    yerlesim[k2_id], k2.boyut):
+                has_collision = True
+                break
+        if has_collision:
+            break
+
+    has_overflow = False
+    for k_id, pos in yerlesim.items():
+        if k_id.startswith("Yakit_Tanki"):
+            continue
+        komp = kmap[k_id]
+        if komp.kilitli:
+            continue
+        if not aircraft.govde_icinde_mi(pos, komp.boyut):
+            has_overflow = True
+            break
+
+    if has_collision:
+        fiz_durum, fiz_mesaj = "kotu", "Parça çakışması var!"
+    elif has_overflow:
+        fiz_durum, fiz_mesaj = "kotu", "Gövdeden taşma var!"
+    elif best_score >= -2500:
+        fiz_durum, fiz_mesaj = "iyi", "Fiziksel ihlal yok, denge harika."
+    else:
+        fiz_durum, fiz_mesaj = "orta", "Fiziksel ihlal yok, ancak denge daha iyi olabilir."
+
+    # --- 4 & 5. Sıcaklık ve titreşim profilleri (motora göre) ---
+    pos_motor = yerlesim.get("Motor")
+
+    def profil(hassasiyet_attr, limit):
+        parcalar = []
+        ihlal = False
+        if pos_motor:
+            for k_id, pos in yerlesim.items():
+                if getattr(kmap[k_id], hassasiyet_attr):
+                    mesafe = ((pos[0] - pos_motor[0]) ** 2
+                              + (pos[1] - pos_motor[1]) ** 2
+                              + (pos[2] - pos_motor[2]) ** 2) ** 0.5
+                    if mesafe < limit:
+                        durum = "risk"
+                        ihlal = True
+                    elif mesafe < limit * 1.5:
+                        durum = "sinir"
+                    else:
+                        durum = "guvenli"
+                    parcalar.append({"id": k_id, "mesafe": round(mesafe, 1), "durum": durum})
+        return {"limit": limit, "ihlal": ihlal, "motor_var": pos_motor is not None,
+                "parcalar": parcalar}
+
+    sicaklik = profil("sicaklik_hassasiyeti", aircraft.sicaklik_limiti)
+    titresim = profil("titresim_hassasiyeti", aircraft.titresim_limiti)
+
+    # --- 6. Denge analizi (yakıt boş/dolu CG kayması) ---
+    bos_agirlik = bos_moment_x = dolu_agirlik = dolu_moment_x = 0.0
+    for k_id, pos in yerlesim.items():
+        mass = kmap[k_id].agirlik
+        bos_agirlik += mass
+        bos_moment_x += mass * pos[0]
+        if k_id in ("Yakit_Tanki_Sol", "Yakit_Tanki_Sag"):
+            m = mass + aircraft.max_yakit_agirligi * 0.5
+        elif k_id == "Yakit_Tanki":
+            m = mass + aircraft.max_yakit_agirligi
+        else:
+            m = mass
+        dolu_agirlik += m
+        dolu_moment_x += m * pos[0]
+    cg_bos_x = bos_moment_x / bos_agirlik if bos_agirlik else 0.0
+    cg_dolu_x = dolu_moment_x / dolu_agirlik if dolu_agirlik else 0.0
+    cg_kaymasi = abs(cg_dolu_x - cg_bos_x)
+    if cg_kaymasi > 5.0:
+        denge_durum, denge_mesaj = "kotu", "Yakıt tüketimi CG'yi çok kaydırıyor! Uçuş stabilitesi tehlikede."
+    elif cg_kaymasi > 2.0:
+        denge_durum, denge_mesaj = "orta", "Yakıt tüketimi dengeyi etkiliyor. Trim ayarı gerekecek."
+    else:
+        denge_durum, denge_mesaj = "iyi", "Yakıt tankı ideal konumda. Tüketimin dengeye etkisi minimum."
+
+    return {
+        "cg": {
+            "x": round(cg_x, 2), "y": round(cg_y, 2), "z": round(cg_z, 2),
+            "hedef_x_min": aircraft.target_cg_x_min, "hedef_x_max": aircraft.target_cg_x_max,
+            "sapma": round(dist_error, 2), "durum": cg_durum, "mesaj": cg_mesaj,
+        },
+        "fiziksel": {
+            "cakisma": has_collision, "tasma": has_overflow,
+            "durum": fiz_durum, "mesaj": fiz_mesaj, "skor": round(best_score, 1),
+        },
+        "sicaklik": sicaklik,
+        "titresim": titresim,
+        "denge": {
+            "yakit_x": round(yakit_pos[0], 2), "hedef_merkez_x": round(hedef_merkez_x, 2),
+            "cg_dolu_x": round(cg_dolu_x, 2), "cg_bos_x": round(cg_bos_x, 2),
+            "kayma": round(cg_kaymasi, 2), "durum": denge_durum, "mesaj": denge_mesaj,
+        },
+    }

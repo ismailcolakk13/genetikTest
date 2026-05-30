@@ -6,7 +6,17 @@ from typing import List, Dict, Optional, Any
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import os
+import sys
 import traceback
+
+# Windows konsolu varsayılan olarak cp1252 kullanır ve algoritmalardaki Türkçe
+# print'lerdeki 'ş', 'ı' gibi karakterleri basamayıp UnicodeEncodeError ile çöker.
+# stdout/stderr'i UTF-8'e çevirerek bunu tek noktadan engelliyoruz.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 
 from modeller.aircraft import Aircraft
 from modeller.komponent import Komponent
@@ -17,6 +27,7 @@ from algoritmalar.nsga2_pso_hybrid import run_nsga2_pso_hybrid
 from yardimcilar.gorsellestirici import (
     _bolge_yuzey_olustur, ucak_govdesi_olustur, ozel_parca_ciz
 )
+from yardimcilar.yerlesimAnaliz import analiz_verisi_uret
 import plotly.graph_objects as go
 import numpy as np
 
@@ -35,6 +46,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def disable_cache(request, call_next):
+    """
+    Geliştirme sırasında tarayıcının eski statik dosyaları (CSS/JS/HTML)
+    cache'den göstermesini engeller. 'no-cache' → tarayıcı kullanmadan önce
+    her zaman sunucuya doğrular, böylece değişiklikler normal yenilemeyle gelir.
+    """
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
 
 class KomponentRequest(BaseModel):
     id: str
@@ -135,6 +159,14 @@ async def run_simulation(req: SimulationRequest):
             _last_result["best_cg"] = best_cg
             _last_result["algoritma"] = req.algoritma
 
+            # Mühendislik analizini üret (CG, denge/yakıt drift, sıcaklık, titreşim).
+            # Analiz başarısız olursa simülasyon sonucu yine de dönsün.
+            try:
+                analiz = analiz_verisi_uret(en_iyi_tasarim, best_score, best_cg, aircraft, req.algoritma)
+            except Exception:
+                traceback.print_exc()
+                analiz = None
+
             response_data = {
                 "success": True,
                 "algoritma_ismi": req.algoritma,
@@ -144,7 +176,8 @@ async def run_simulation(req: SimulationRequest):
                     "y": round(best_cg[1], 2),
                     "z": round(best_cg[2], 2)
                 },
-                "tasarim": tasarim_json
+                "tasarim": tasarim_json,
+                "analiz": analiz
             }
 
             return response_data
@@ -178,8 +211,8 @@ async def get_3d_view():
     for parca in ucak_govdesi_olustur(aircraft):
         fig.add_trace(parca)
 
-    # 3. Komponentler — gerçekçi şekiller
-    colors = ['red', 'blue', 'orange', 'purple', 'green', 'brown', 'cyan']
+    # 3. Komponentler — gerçekçi şekiller (teknik blueprint paleti)
+    colors = ['#1e3a5f', '#e0641c', '#2a7f62', '#7d5ba6', '#3b6ea5', '#b5651d', '#4a5568']
     for k_id, pos in en_iyi_tasarim.yerlesim.items():
         boyut = next(item for item in aircraft.komponentler_db if item.id == k_id).boyut
         idx = aircraft.komponentler_db.index(
@@ -192,7 +225,7 @@ async def get_3d_view():
         fig.add_trace(go.Scatter3d(
             x=[pos[0]], y=[pos[1]], z=[pos[2] + boyut[2] / 1.5],
             mode='text', text=[k_id], textposition="top center",
-            textfont=dict(size=10, color="black", family="Arial Bold"), showlegend=False
+            textfont=dict(size=10, color="#16202e", family="Arial Bold"), showlegend=False
         ))
 
     # 4. Hedef CG aralığı
@@ -204,25 +237,25 @@ async def get_3d_view():
            aircraft.target_cg_x_max, aircraft.target_cg_x_min],
         y=[-box_r, -box_r, box_r, box_r, -box_r, -box_r, box_r, box_r],
         z=[-box_r, -box_r, -box_r, -box_r, box_r, box_r, box_r, box_r],
-        color='gold', opacity=0.3, name='HEDEF CG ARALIĞI', alphahull=0
+        color='#e0641c', opacity=0.18, name='HEDEF CG ARALIĞI', alphahull=0
     ))
 
     # 5. CG gösterimi
     viz_z = aircraft.govde_yaricap + 40
     fig.add_trace(go.Scatter3d(
         x=[best_cg[0]], y=[best_cg[1]], z=[viz_z],
-        mode='markers+text', marker=dict(size=12, color='black', symbol='diamond'),
+        mode='markers+text', marker=dict(size=12, color='#1e3a5f', symbol='diamond'),
         name='HESAPLANAN CG', text=["HESAPLANAN CG"], textposition="top center",
-        textfont=dict(color='black')
+        textfont=dict(color='#16202e')
     ))
     fig.add_trace(go.Scatter3d(
         x=[best_cg[0], best_cg[0]], y=[best_cg[1], best_cg[1]], z=[best_cg[2], viz_z],
-        mode='lines', line=dict(color='black', width=3),
+        mode='lines', line=dict(color='#1e3a5f', width=3),
         showlegend=False, hoverinfo='skip'
     ))
     fig.add_trace(go.Scatter3d(
         x=[best_cg[0]], y=[best_cg[1]], z=[best_cg[2]],
-        mode='markers', marker=dict(size=5, color='black'),
+        mode='markers', marker=dict(size=5, color='#1e3a5f'),
         name='Gerçek CG Konumu'
     ))
 
@@ -231,28 +264,45 @@ async def get_3d_view():
         x=[target_x_visual, best_cg[0]],
         y=[aircraft.target_cg_y, best_cg[1]],
         z=[aircraft.target_cg_z, best_cg[2]],
-        mode='lines', line=dict(color='red', width=4, dash='dot'), name='CG Hatası'
+        mode='lines', line=dict(color='#c0392b', width=4, dash='dot'), name='CG Hatası'
     ))
 
-    # Açık tema layout (Reverted to original)
+    # Teknik blueprint teması: açık zemin, ince navy grid, navy metin
     camera = dict(eye=dict(x=2.0, y=-2.0, z=1.0))
+    pane_bg = "rgb(244, 246, 250)"
+    grid_col = "rgba(30, 58, 95, 0.15)"
+    axis_style = dict(
+        backgroundcolor=pane_bg,
+        gridcolor=grid_col,
+        zerolinecolor="rgba(30, 58, 95, 0.35)",
+        showbackground=True,
+        tickfont=dict(color='#3a4759')
+    )
+    title_font = dict(color='#1e3a5f')
     fig.update_layout(
         title=dict(
             text=f"Ön Tasarım: Uçak İçi Sistem Yerleşimi Optimizasyonu ({ALGORITMA}) | Skor: {best_score:.0f}",
-            font=dict(color='black', size=16)
+            font=dict(color='#16202e', size=16, family='Roboto Mono, monospace')
         ),
         scene=dict(
-            xaxis=dict(title='Uzunluk (cm)', range=[0, aircraft.govde_uzunluk],
-                       backgroundcolor="rgb(240, 240, 240)"),
-            yaxis=dict(title='Genişlik (cm)', range=[-200, 200]),
-            zaxis=dict(title='Yükseklik (cm)', range=[-100, 100]),
+            xaxis=dict(title=dict(text='Uzunluk (cm)', font=title_font),
+                       range=[0, aircraft.govde_uzunluk], **axis_style),
+            yaxis=dict(title=dict(text='Genişlik (cm)', font=title_font),
+                       range=[-200, 200], **axis_style),
+            zaxis=dict(title=dict(text='Yükseklik (cm)', font=title_font),
+                       range=[-100, 100], **axis_style),
             aspectmode='data',
             camera=camera
         ),
         paper_bgcolor='white',
         plot_bgcolor='white',
-        font=dict(color='black'),
-        legend=dict(font=dict(color='black')),
+        font=dict(color='#16202e'),
+        legend=dict(
+            font=dict(color='#16202e'),
+            bgcolor='rgba(255, 255, 255, 0.7)',
+            bordercolor='rgba(30, 58, 95, 0.2)',
+            borderwidth=1
+        ),
         margin=dict(r=0, l=0, b=0, t=50)
     )
 
